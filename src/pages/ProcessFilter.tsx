@@ -61,29 +61,43 @@ const ProcessFilter = () => {
   const processFiltering = async () => {
     if (!user || processing) return;
 
+    console.log('Starting filtering process...');
     setProcessing(true);
     setProgress(0);
     setCurrentStep('Initializing...');
 
     try {
       // Get candidates and filter rules
+      console.log('Loading data...');
       setCurrentStep('Loading data...');
       setProgress(10);
 
-      const { data: candidates } = await supabase
+      const { data: candidates, error: candidatesError } = await supabase
         .from('raw_data')
         .select('*')
         .eq('user_id', user.id);
 
-      const { data: filterRules } = await supabase
+      if (candidatesError) {
+        console.error('Error loading candidates:', candidatesError);
+        throw candidatesError;
+      }
+
+      const { data: filterRules, error: filterRulesError } = await supabase
         .from('filter_rules')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
+      if (filterRulesError) {
+        console.error('Error loading filter rules:', filterRulesError);
+        throw filterRulesError;
+      }
+
       if (!candidates || !filterRules) {
         throw new Error('Missing candidates or filter configuration');
       }
+
+      console.log(`Found ${candidates.length} candidates and filter rules:`, filterRules);
 
       // Get built-in lists if needed
       setCurrentStep('Loading built-in lists...');
@@ -110,12 +124,23 @@ const ProcessFilter = () => {
         .eq('user_id', user.id)
         .eq('job_id', filterRules.job_id);
 
+      console.log('Loaded lists:', {
+        notRelevantCompanies: notRelevantCompanies?.length || 0,
+        targetCompanies: targetCompanies?.length || 0,
+        blacklistCompanies: blacklistCompanies?.length || 0,
+        pastCandidates: pastCandidates?.length || 0
+      });
+
       // Clear existing results for this job
-      await supabase
+      const { error: deleteError } = await supabase
         .from('filtered_results')
         .delete()
         .eq('user_id', user.id)
         .eq('job_id', filterRules.job_id);
+
+      if (deleteError) {
+        console.error('Error clearing previous results:', deleteError);
+      }
 
       setCurrentStep('Processing candidates...');
       setProgress(30);
@@ -125,6 +150,8 @@ const ProcessFilter = () => {
       let finalResults = 0;
 
       const results = [];
+
+      console.log('Starting candidate processing...');
 
       // Process each candidate
       for (let i = 0; i < candidates.length; i++) {
@@ -256,19 +283,23 @@ const ProcessFilter = () => {
           filter_reasons: filterReasons
         });
 
-        // Update progress
-        const progressPercent = 30 + ((i + 1) / candidates.length) * 60;
-        setProgress(progressPercent);
-        setStats(prev => ({
-          ...prev,
-          processed: i + 1,
-          stage1Passed,
-          stage2Passed,
-          finalResults
-        }));
+        // Update progress every 100 candidates
+        if (i % 100 === 0 || i === candidates.length - 1) {
+          const progressPercent = 30 + ((i + 1) / candidates.length) * 60;
+          setProgress(progressPercent);
+          setStats(prev => ({
+            ...prev,
+            processed: i + 1,
+            stage1Passed,
+            stage2Passed,
+            finalResults
+          }));
+          console.log(`Processed ${i + 1}/${candidates.length} candidates. Stage1: ${stage1Passed}, Stage2: ${stage2Passed}, Final: ${finalResults}`);
+        }
       }
 
       // Save results to database
+      console.log('Saving results to database...');
       setCurrentStep('Saving results...');
       setProgress(95);
 
@@ -276,11 +307,16 @@ const ProcessFilter = () => {
         .from('filtered_results')
         .insert(results);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving results:', error);
+        throw error;
+      }
 
       setProgress(100);
       setCurrentStep('Completed!');
       setCompleted(true);
+
+      console.log(`Filtering completed! Final stats: Stage1: ${stage1Passed}, Stage2: ${stage2Passed}, Final: ${finalResults}`);
 
       toast({
         title: "Filtering Complete!",
