@@ -160,7 +160,7 @@ const ProcessFilter = () => {
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
         let stage1Pass = true;
-        let stage2Pass = true;
+        let stage2Pass = false; // Stage 2 starts as false, only becomes true if stage 1 passes AND stage 2 criteria are met
         const filterReasons = [];
 
         // STAGE 1: Company & Lists Filtering
@@ -207,6 +207,8 @@ const ProcessFilter = () => {
 
         // STAGE 2: User Rules Filtering (only if passed Stage 1)
         if (stage1Pass) {
+          stage2Pass = true; // Start with true, will become false if any criteria fails
+          
           // Check minimum experience
           if (candidate.years_of_experience < filterRules.min_years_experience) {
             stage2Pass = false;
@@ -214,13 +216,13 @@ const ProcessFilter = () => {
           }
 
           // Check minimum months in current role
-          if (candidate.months_in_current_role < filterRules.min_months_current_role) {
+          if (stage2Pass && candidate.months_in_current_role < filterRules.min_months_current_role) {
             stage2Pass = false;
             filterReasons.push(`Less than ${filterRules.min_months_current_role} months in current role`);
           }
 
           // Check exclude terms
-          if (filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+          if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
             const currentTitle = candidate.current_title?.toLowerCase() || '';
             const hasExcludedTerm = filterRules.exclude_terms.some((term: string) => 
               currentTitle.includes(term.toLowerCase())
@@ -232,7 +234,7 @@ const ProcessFilter = () => {
           }
 
           // Check must have terms
-          if (filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+          if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
             const profileText = `${candidate.current_title} ${candidate.profile_summary}`.toLowerCase();
             const hasMustHaveTerm = filterRules.must_have_terms.some((term: string) => 
               profileText.includes(term.toLowerCase())
@@ -244,7 +246,7 @@ const ProcessFilter = () => {
           }
 
           // Check required titles
-          if (filterRules.required_titles && filterRules.required_titles.length > 0) {
+          if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
             const currentTitle = candidate.current_title?.toLowerCase() || '';
             const hasRequiredTitle = filterRules.required_titles.some((title: string) => 
               currentTitle.includes(title.toLowerCase())
@@ -256,7 +258,7 @@ const ProcessFilter = () => {
           }
 
           // Check top university requirement
-          if (filterRules.require_top_uni) {
+          if (stage2Pass && filterRules.require_top_uni) {
             const { data: topUniversities } = await supabase
               .from('top_universities')
               .select('university_name');
