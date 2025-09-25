@@ -119,10 +119,12 @@ const Dashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full">
-                  <BarChart3 className="h-4 w-4" />
-                  View Results
-                </Button>
+                <Link to="/results">
+                  <Button variant="outline" className="w-full">
+                    <BarChart3 className="h-4 w-4" />
+                    View Results
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
