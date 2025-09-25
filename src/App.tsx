@@ -12,6 +12,7 @@ import FilterConfig from "./pages/FilterConfig";
 import ProcessFilter from "./pages/ProcessFilter";
 import Results from "./pages/Results";
 import AdminCosts from "./pages/AdminCosts";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,7 +32,8 @@ const App = () => (
             <Route path="/filter-config" element={<FilterConfig />} />
             <Route path="/process-filter" element={<ProcessFilter />} />
             <Route path="/results" element={<Results />} />
-            <Route path="/admin-costs" element={<AdminCosts />} />
+          <Route path="/admin-costs" element={<AdminCosts />} />
+          <Route path="/admin-panel" element={<AdminPanel />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

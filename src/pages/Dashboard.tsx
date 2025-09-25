@@ -193,14 +193,14 @@ const Dashboard = () => {
                   </div>
                   <CardTitle className="text-lg">Admin Panel</CardTitle>
                   <CardDescription>
-                    View API costs and system analytics
+                    Manage companies, synonyms, users and API costs
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Link to="/admin-costs">
+                  <Link to="/admin-panel">
                     <Button variant="outline" className="w-full">
                       <Users className="h-4 w-4" />
-                      API Cost Tracking
+                      Admin Dashboard
                     </Button>
                   </Link>
                 </CardContent>
