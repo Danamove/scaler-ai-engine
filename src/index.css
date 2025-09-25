@@ -8,110 +8,110 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Enterprise Color Palette */
+    /* Blue/White/Light Purple/Black Color Palette */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 0%;
 
-    --card: 255 255 255;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
 
-    --popover: 255 255 255;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
 
-    /* Primary - Professional Blue */
-    --primary: 217 91% 60%;
-    --primary-foreground: 255 255 255;
-    --primary-hover: 217 91% 55%;
-    --primary-muted: 217 91% 60%;
+    /* Primary - Blue */
+    --primary: 220 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 100% 45%;
+    --primary-muted: 220 100% 95%;
 
-    /* Secondary - Success Green */
-    --secondary: 158 64% 52%;
-    --secondary-foreground: 255 255 255;
-    --secondary-hover: 158 64% 47%;
+    /* Secondary - Light Purple */
+    --secondary: 270 50% 70%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 270 50% 65%;
 
-    /* Accent - Warning Orange */
-    --accent: 24 95% 53%;
-    --accent-foreground: 255 255 255;
-    --accent-hover: 24 95% 48%;
+    /* Accent - Deeper Blue */
+    --accent: 210 100% 60%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 210 100% 55%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 60%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 100% 50%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 220 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 0 0% 20%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 220 100% 50%;
 
     /* Custom Design Tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 75%));
-    --gradient-secondary: linear-gradient(135deg, hsl(158 64% 52%), hsl(158 64% 67%));
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 40%));
-    --shadow-enterprise: 0 8px 32px -8px hsl(217 91% 60% / 0.2);
+    --gradient-primary: linear-gradient(135deg, hsl(220 100% 50%), hsl(210 100% 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(270 50% 70%), hsl(280 50% 75%));
+    --gradient-hero: linear-gradient(135deg, hsl(220 100% 50%), hsl(270 50% 70%));
+    --shadow-enterprise: 0 8px 32px -8px hsl(220 100% 50% / 0.2);
     --shadow-card: 0 4px 16px -4px hsl(0 0% 0% / 0.1);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 255 255 255;
-    --primary-hover: 217 91% 55%;
-    --primary-muted: 217 91% 60%;
+    --primary: 220 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 100% 55%;
+    --primary-muted: 220 100% 20%;
 
-    --secondary: 158 64% 52%;
-    --secondary-foreground: 255 255 255;
-    --secondary-hover: 158 64% 47%;
+    --secondary: 270 50% 70%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 270 50% 65%;
 
-    --accent: 24 95% 53%;
-    --accent-foreground: 255 255 255;
-    --accent-hover: 24 95% 48%;
+    --accent: 210 100% 65%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 210 100% 60%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 217 91% 60%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 220 100% 60%;
     
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 220 100% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 220 100% 60%;
 
     /* Custom Design Tokens - Dark Mode */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 45%));
-    --gradient-secondary: linear-gradient(135deg, hsl(158 64% 52%), hsl(158 64% 37%));
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 30%));
-    --shadow-enterprise: 0 8px 32px -8px hsl(217 91% 60% / 0.3);
-    --shadow-card: 0 4px 16px -4px hsl(0 0% 0% / 0.2);
+    --gradient-primary: linear-gradient(135deg, hsl(220 100% 60%), hsl(210 100% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(270 50% 70%), hsl(280 50% 65%));
+    --gradient-hero: linear-gradient(135deg, hsl(220 100% 60%), hsl(270 50% 70%));
+    --shadow-enterprise: 0 8px 32px -8px hsl(220 100% 60% / 0.3);
+    --shadow-card: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
   }
 }
 
