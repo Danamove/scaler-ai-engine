@@ -6,6 +6,7 @@ import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import Papa from 'papaparse';
 
 interface FileUploadProps {
   title: string;
@@ -48,86 +49,31 @@ export const FileUpload = ({
     }
   };
 
-  const parseCSV = (text: string): any[] => {
-    try {
-      // More robust CSV parsing that handles quoted fields and multiline content
-      const lines = text.split('\n');
-      if (lines.length === 0) return [];
-
-      // Get headers from first line
-      const headerLine = lines[0];
-      const headers = [];
-      let currentField = '';
-      let inQuotes = false;
-      
-      for (let i = 0; i < headerLine.length; i++) {
-        const char = headerLine[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          headers.push(currentField.trim().replace(/^"|"$/g, ''));
-          currentField = '';
-        } else {
-          currentField += char;
-        }
+  const parseCSV = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      try {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: 'greedy',
+          dynamicTyping: false,
+          worker: true,
+          transformHeader: (h: string) => h.trim(),
+          complete: (results) => {
+            const rows = (results.data as any[]).filter((row) =>
+              Object.values(row).some((v) => String(v ?? '').trim().length > 0)
+            );
+            resolve(rows);
+          },
+          error: (err) => {
+            console.error('CSV parsing error:', err);
+            reject(err);
+          },
+        });
+      } catch (error) {
+        console.error('CSV parsing setup error:', error);
+        reject(error);
       }
-      headers.push(currentField.trim().replace(/^"|"$/g, ''));
-
-      const data = [];
-      let i = 1;
-      
-      while (i < lines.length) {
-        const values = [];
-        let currentValue = '';
-        let inQuotes = false;
-        let lineIndex = i;
-        
-        // Parse the current row, potentially spanning multiple lines
-        while (lineIndex < lines.length) {
-          const line = lines[lineIndex];
-          
-          for (let j = 0; j < line.length; j++) {
-            const char = line[j];
-            
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-              values.push(currentValue.trim().replace(/^"|"$/g, ''));
-              currentValue = '';
-            } else {
-              currentValue += char;
-            }
-          }
-          
-          // If we're not in quotes, this row is complete
-          if (!inQuotes) {
-            values.push(currentValue.trim().replace(/^"|"$/g, ''));
-            break;
-          } else {
-            // Add newline and continue to next line
-            currentValue += '\n';
-          }
-          
-          lineIndex++;
-        }
-        
-        // Only add row if it has the expected number of fields
-        if (values.length === headers.length && values.some(v => v.length > 0)) {
-          const row: any = {};
-          headers.forEach((header, index) => {
-            row[header] = values[index] || '';
-          });
-          data.push(row);
-        }
-        
-        i = lineIndex + 1;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('CSV parsing error:', error);
-      return [];
-    }
+    });
   };
 
   const saveToDatabase = async (data: any[]) => {
@@ -173,12 +119,12 @@ export const FileUpload = ({
         };
       });
 
-      const { error } = await supabase
-        .from('raw_data')
-        .insert(rawDataRecords);
-
-      if (error) {
-        throw error;
+      // Insert in chunks to handle large files reliably
+      const chunkSize = 500;
+      for (let i = 0; i < rawDataRecords.length; i += chunkSize) {
+        const chunk = rawDataRecords.slice(i, i + chunkSize);
+        const { error } = await supabase.from('raw_data').insert(chunk);
+        if (error) throw error;
       }
 
       toast({
@@ -225,8 +171,7 @@ export const FileUpload = ({
         });
       }, 200);
 
-      const text = await file.text();
-      const data = parseCSV(text);
+      const data = await parseCSV(file);
 
       if (data.length === 0) {
         throw new Error("No valid data found in CSV file");
