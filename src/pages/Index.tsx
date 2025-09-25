@@ -270,7 +270,7 @@ const Index = () => {
               <span className="font-semibold text-foreground">Filterly</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2024 Filterly. Enterprise candidate filtering system.
+              © 2025 Filterly by AddedValue
             </div>
           </div>
         </div>
