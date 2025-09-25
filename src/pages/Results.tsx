@@ -209,6 +209,112 @@ const Results = () => {
     return null;
   }
 
+  // Show getting started message if no data
+  if (stats.total_candidates === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">Filterly</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Badge variant="secondary">
+                {user.email}
+              </Badge>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-2xl mx-auto text-center space-y-8">
+            <div className="h-24 w-24 bg-muted/30 rounded-full flex items-center justify-center mx-auto">
+              <BarChart3 className="h-12 w-12 text-muted-foreground" />
+            </div>
+            
+            <div className="space-y-4">
+              <h1 className="text-3xl font-bold">No Results Yet</h1>
+              <p className="text-xl text-muted-foreground">
+                To see filtering results, you need to complete the following steps:
+              </p>
+            </div>
+
+            <div className="space-y-6 text-left">
+              <div className="flex items-start space-x-4 p-4 border rounded-lg">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary">1</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Upload Raw Data</h3>
+                  <p className="text-muted-foreground mb-3">
+                    Upload your LinkedIn scraped candidate CSV file to the system.
+                  </p>
+                  <Link to="/upload">
+                    <Button variant="outline" size="sm">
+                      <FileText className="h-4 w-4" />
+                      Upload Data
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4 p-4 border rounded-lg">
+                <div className="h-8 w-8 rounded-full bg-secondary/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-secondary">2</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Configure Filters</h3>
+                  <p className="text-muted-foreground mb-3">
+                    Set up your filtering rules for Stage 1 and Stage 2 processing.
+                  </p>
+                  <Link to="/filter-config">
+                    <Button variant="outline" size="sm">
+                      <Filter className="h-4 w-4" />
+                      Configure Filters
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4 p-4 border rounded-lg bg-muted/20">
+                <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-accent">3</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Run Filtering Process</h3>
+                  <p className="text-muted-foreground mb-3">
+                    Execute the filtering logic to process candidates (feature coming soon).
+                  </p>
+                  <Button variant="outline" size="sm" disabled>
+                    <Users className="h-4 w-4" />
+                    Process Candidates
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <Link to="/dashboard">
+                <Button variant="hero">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const stage1PassRate = stats.total_candidates > 0 ? (stats.stage_1_passed / stats.total_candidates) * 100 : 0;
   const stage2PassRate = stats.stage_1_passed > 0 ? (stats.stage_2_passed / stats.stage_1_passed) * 100 : 0;
   const finalPassRate = stats.total_candidates > 0 ? (stats.final_results / stats.total_candidates) * 100 : 0;
