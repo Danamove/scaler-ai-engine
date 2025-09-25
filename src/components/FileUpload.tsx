@@ -26,6 +26,7 @@ export const FileUpload = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[]>([]);
+  const [currentStep, setCurrentStep] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -80,8 +81,16 @@ export const FileUpload = ({
     if (!user) return;
 
     try {
+      console.log('Transforming data for database...');
+      setCurrentStep('Transforming candidate data...');
+      
       // Transform LinkedIn scraped data to match our raw_data table structure
-      const rawDataRecords = data.map(row => {
+      const rawDataRecords = data.map((row, index) => {
+        if (index % 1000 === 0) {
+          console.log(`Transforming record ${index}/${data.length}`);
+          setUploadProgress(30 + Math.floor((index / data.length) * 30));
+        }
+        
         // Calculate years of experience from date ranges if available
         const getYearsFromDateRange = (dateRange: string): number => {
           if (!dateRange || dateRange.includes('Present')) return 0;
@@ -119,6 +128,10 @@ export const FileUpload = ({
         };
       });
 
+      console.log('Starting database insert...');
+      setCurrentStep('Saving to database...');
+      setUploadProgress(60);
+
       // Insert in small chunks to handle very large files and avoid payload limits
       const total = rawDataRecords.length;
       const chunkSize = 100;
@@ -129,13 +142,16 @@ export const FileUpload = ({
           console.error('Chunk insert error at index', i, error);
           throw error;
         }
-        // Update progress smoothly between 95% and 99%
-        const progressWithinSave = 95 + Math.min(4, Math.floor(((i + chunk.length) / total) * 5));
+        // Update progress smoothly between 60% and 95%
+        const progressWithinSave = 60 + Math.floor(((i + chunk.length) / total) * 35);
         setUploadProgress(progressWithinSave);
+        setCurrentStep(`Saving batch ${Math.floor(i/chunkSize) + 1}/${Math.ceil(total/chunkSize)}...`);
+        console.log(`Saved batch ${Math.floor(i/chunkSize) + 1}/${Math.ceil(total/chunkSize)}`);
         // Tiny delay to prevent rate limiting and keep UI responsive
         await new Promise((res) => setTimeout(res, 50));
       }
 
+      console.log('Database save completed successfully');
       toast({
         title: "Success!",
         description: `Uploaded ${rawDataRecords.length} candidate records to database.`,
@@ -146,15 +162,13 @@ export const FileUpload = ({
       }
     } catch (error: any) {
       console.error('Database error:', error);
-      toast({
-        title: "Database Error",
-        description: error.message || "Failed to save data to database.",
-        variant: "destructive",
-      });
+      throw error; // Re-throw so the main handler can catch it
     }
   };
 
   const handleFileUpload = async (file: File) => {
+    console.log('Starting file upload for:', file.name, 'Size:', file.size);
+    
     if (!file.name.toLowerCase().endsWith('.csv')) {
       toast({
         title: "Invalid File Type",
@@ -169,29 +183,26 @@ export const FileUpload = ({
     setUploadedFile(file);
 
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
+      console.log('Starting CSV parsing...');
+      setCurrentStep('Parsing CSV file...');
+      setUploadProgress(10);
 
       const data = await parseCSV(file);
+      console.log('CSV parsed successfully, rows:', data.length);
 
       if (data.length === 0) {
         throw new Error("No valid data found in CSV file");
       }
 
+      setUploadProgress(30);
       setParsedData(data);
-      setUploadProgress(95);
+      setCurrentStep('Saving to database...');
 
+      console.log('Starting database save...');
       // Save to database
       await saveToDatabase(data);
       setUploadProgress(100);
+      setCurrentStep('Upload complete!');
 
       toast({
         title: "File Uploaded Successfully!",
@@ -200,6 +211,7 @@ export const FileUpload = ({
 
     } catch (error: any) {
       console.error('Upload error:', error);
+      setCurrentStep('Upload failed');
       toast({
         title: "Upload Error",
         description: error.message || "Failed to process the file.",
@@ -298,14 +310,26 @@ export const FileUpload = ({
           onClick={handleFileSelect}
         >
           {isUploading ? (
-            <div className="space-y-4">
-              <div className="h-12 w-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
-                <Upload className="h-6 w-6 text-primary animate-pulse" />
+            <div className="space-y-6">
+              <div className="h-16 w-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto relative">
+                <Upload className="h-8 w-8 text-primary" />
+                {/* Animated ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
               </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Uploading file...</p>
-                <Progress value={uploadProgress} className="w-full max-w-xs mx-auto" />
-                <p className="text-xs text-muted-foreground">{uploadProgress}%</p>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-base font-medium mb-2">Uploading file...</p>
+                  {currentStep && (
+                    <p className="text-sm text-muted-foreground">{currentStep}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Progress value={uploadProgress} className="w-full max-w-sm mx-auto h-3" />
+                  <div className="flex justify-between text-xs text-muted-foreground max-w-sm mx-auto">
+                    <span>{uploadProgress}%</span>
+                    <span>Please wait...</span>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
