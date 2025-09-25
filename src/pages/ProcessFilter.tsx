@@ -72,15 +72,34 @@ const ProcessFilter = () => {
       setCurrentStep('Loading data...');
       setProgress(10);
 
-      const { data: candidates, error: candidatesError } = await supabase
-        .from('raw_data')
-        .select('*')
-        .eq('user_id', user.id);
+      // Load all candidates with pagination to bypass 1000 row limit
+      let allCandidates = [];
+      let hasMore = true;
+      let offset = 0;
+      const pageSize = 1000;
 
-      if (candidatesError) {
-        console.error('Error loading candidates:', candidatesError);
-        throw candidatesError;
+      while (hasMore) {
+        const { data: candidatesPage, error: candidatesError } = await supabase
+          .from('raw_data')
+          .select('*')
+          .eq('user_id', user.id)
+          .range(offset, offset + pageSize - 1);
+
+        if (candidatesError) {
+          console.error('Error loading candidates:', candidatesError);
+          throw candidatesError;
+        }
+
+        if (candidatesPage && candidatesPage.length > 0) {
+          allCandidates.push(...candidatesPage);
+          offset += pageSize;
+          hasMore = candidatesPage.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
+
+      const candidates = allCandidates;
 
       const { data: filterRulesArray, error: filterRulesError } = await supabase
         .from('filter_rules')
