@@ -13,7 +13,8 @@ import { Separator } from '@/components/ui/separator';
 import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAdminImpersonation, ALLOWED_USERS } from '@/hooks/useAdminImpersonation';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Company {
   id: string;
@@ -38,6 +39,7 @@ interface ApiCost {
 
 const AdminPanel = () => {
   const { user, loading } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { impersonatedUser, setImpersonatedUser, canImpersonate } = useAdminImpersonation();
@@ -72,10 +74,10 @@ const AdminPanel = () => {
 
   // Load data
   useEffect(() => {
-    if (user && user.email === 'dana@added-value.co.il') {
+    if (user && isAdmin) {
       loadAllData();
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -85,7 +87,7 @@ const AdminPanel = () => {
         supabase.from('not_relevant_companies').select('*').order('company_name'),
         supabase.from('synonyms').select('*').order('canonical_term'),
         supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*').in('email', ALLOWED_USERS).order('email')
+        supabase.from('profiles').select('*').order('email')
       ]);
 
       if (targetResponse.data) setTargetCompanies(targetResponse.data);
@@ -659,37 +661,30 @@ const AdminPanel = () => {
                 <div className="space-y-4">
                   <h4 className="font-medium">Select User to View</h4>
                   <div className="grid gap-3">
-                    {ALLOWED_USERS.map((email) => {
-                      const profile = userProfiles.find(p => p.email === email);
-                      const isActive = impersonatedUser?.email === email;
+                    {userProfiles.map((profile) => {
+                      const isActive = impersonatedUser?.email === profile.email;
                       
                       return (
                         <div 
-                          key={email} 
+                          key={profile.email} 
                           className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
                             isActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
                           }`}
                         >
                           <div>
-                            <p className="font-medium">{email}</p>
-                            {profile && (
-                              <p className="text-sm text-muted-foreground">
-                                {profile.full_name || 'Name not set'}
-                              </p>
-                            )}
+                            <p className="font-medium">{profile.email}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {profile.full_name || 'Name not set'}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            {!profile && (
-                              <Badge variant="secondary">Not registered</Badge>
-                            )}
                             <Button
                               variant={isActive ? "default" : "outline"}
                               size="sm"
-                              disabled={!profile}
                               onClick={() => {
                                 if (isActive) {
                                   setImpersonatedUser(null);
-                                } else if (profile) {
+                                } else {
                                   setImpersonatedUser({
                                     email: profile.email,
                                     user_id: profile.user_id

@@ -1,5 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ImpersonatedUser {
   email: string;
@@ -29,23 +31,13 @@ interface AdminImpersonationProviderProps {
   children: ReactNode;
 }
 
-const ALLOWED_USERS = [
-  'shiri@added-value.co.il',
-  'chen@added-value.co.il', 
-  'alex@added-value.co.il',
-  'katinka@added-value.co.il',
-  'mikaka@added-value.co.il',
-  'danana@added-value.co.il',
-  'andreas@added-value.co.il',
-  'eszterz@added-value.co.il'
-];
-
 export const AdminImpersonationProvider = ({ children }: AdminImpersonationProviderProps) => {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [impersonatedUser, setImpersonatedUser] = useState<ImpersonatedUser | null>(null);
   
   // Check if current user can impersonate others (admin only)
-  const canImpersonate = user?.email === 'dana@added-value.co.il';
+  const canImpersonate = isAdmin;
   
   // Clear impersonation if user is not admin
   useEffect(() => {
@@ -68,9 +60,26 @@ export const AdminImpersonationProvider = ({ children }: AdminImpersonationProvi
     return user?.email || '';
   };
 
+  // Log impersonation actions for audit
+  const setImpersonatedUserWithAudit = async (targetUser: ImpersonatedUser | null) => {
+    if (canImpersonate && user?.id) {
+      try {
+        await supabase.from('admin_audit_log').insert({
+          admin_user_id: user.id,
+          action: targetUser ? 'USER_IMPERSONATION_START' : 'USER_IMPERSONATION_END',
+          target_user_id: targetUser?.user_id || impersonatedUser?.user_id,
+          details: targetUser ? { email: targetUser.email } : null,
+        });
+      } catch (error) {
+        console.error('Failed to log impersonation action:', error);
+      }
+    }
+    setImpersonatedUser(targetUser);
+  };
+
   const value = {
     impersonatedUser,
-    setImpersonatedUser,
+    setImpersonatedUser: setImpersonatedUserWithAudit,
     isImpersonating: canImpersonate && !!impersonatedUser,
     canImpersonate,
     getActiveUserId,
@@ -83,5 +92,3 @@ export const AdminImpersonationProvider = ({ children }: AdminImpersonationProvi
     </AdminImpersonationContext.Provider>
   );
 };
-
-export { ALLOWED_USERS };
