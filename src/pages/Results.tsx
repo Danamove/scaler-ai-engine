@@ -284,19 +284,21 @@ const Results = () => {
                 </div>
               </div>
 
-              <div className="flex items-start space-x-4 p-4 border rounded-lg bg-muted/20">
+              <div className="flex items-start space-x-4 p-4 border rounded-lg">
                 <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center">
                   <span className="text-sm font-bold text-accent">3</span>
                 </div>
                 <div>
                   <h3 className="font-semibold mb-2">Run Filtering Process</h3>
                   <p className="text-muted-foreground mb-3">
-                    Execute the filtering logic to process candidates (feature coming soon).
+                    Execute the filtering logic to process candidates through Stage 1 and Stage 2.
                   </p>
-                  <Button variant="outline" size="sm" disabled>
-                    <Users className="h-4 w-4" />
-                    Process Candidates
-                  </Button>
+                  <Link to="/process-filter">
+                    <Button variant="hero" size="sm">
+                      <Users className="h-4 w-4" />
+                      Process Candidates
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
