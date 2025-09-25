@@ -1,62 +1,73 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
-type UserRole = 'admin' | 'user';
+type UserRole = Database['public']['Enums']['user_role'];
 
 interface UseUserRoleReturn {
   role: UserRole | null;
   isAdmin: boolean;
-  isLoading: boolean;
-  refreshRole: () => Promise<void>;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
 }
 
 export const useUserRole = (): UseUserRoleReturn => {
   const { user } = useAuth();
   const [role, setRole] = useState<UserRole | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchUserRole = async () => {
     if (!user?.id) {
       setRole(null);
-      setIsLoading(false);
+      setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      setError(null);
+
+      const { data, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        console.error('Error fetching user role:', error);
-        setRole('user'); // Default to user role
+      if (roleError) {
+        if (roleError.code === 'PGRST116') {
+          // No role found, default to 'user'
+          setRole('user');
+        } else {
+          throw roleError;
+        }
       } else {
-        setRole(data?.role || 'user');
+        setRole(data.role);
       }
-    } catch (error) {
-      console.error('Error fetching user role:', error);
-      setRole('user'); // Default to user role
+    } catch (err) {
+      console.error('Error fetching user role:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch user role');
+      setRole('user'); // Default to user role on error
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
-
-  const refreshRole = async () => {
-    setIsLoading(true);
-    await fetchUserRole();
   };
 
   useEffect(() => {
     fetchUserRole();
   }, [user?.id]);
 
+  const refetch = async () => {
+    await fetchUserRole();
+  };
+
   return {
     role,
     isAdmin: role === 'admin',
-    isLoading,
-    refreshRole,
+    loading,
+    error,
+    refetch,
   };
 };

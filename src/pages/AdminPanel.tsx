@@ -62,7 +62,7 @@ const AdminPanel = () => {
 
   // Check admin access
   useEffect(() => {
-    if (!loading && (!user || user.email !== 'dana@added-value.co.il')) {
+    if (!loading && (!user || !isAdmin)) {
       navigate('/dashboard');
       toast({
         title: "Access Denied",
@@ -70,7 +70,7 @@ const AdminPanel = () => {
         variant: "destructive",
       });
     }
-  }, [user, loading, navigate, toast]);
+  }, [user, loading, isAdmin, navigate, toast]);
 
   // Load data
   useEffect(() => {

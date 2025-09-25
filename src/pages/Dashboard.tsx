@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw, Briefcase } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
@@ -21,10 +22,10 @@ interface DashboardStats {
 
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isRestarting, setIsRestarting] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalCandidates: 0,
     filterAccuracy: 0,
@@ -138,14 +139,7 @@ const Dashboard = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (user?.email === 'dana@added-value.co.il') {
-        setIsAdmin(true);
-      }
-    };
-    
     if (user) {
-      checkAdminStatus();
       fetchDashboardStats();
     }
   }, [user, getActiveUserId]);

@@ -92,3 +92,5 @@ export const AdminImpersonationProvider = ({ children }: AdminImpersonationProvi
     </AdminImpersonationContext.Provider>
   );
 };
+
+// ALLOWED_USERS array removed - now using database role system
