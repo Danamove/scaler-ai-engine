@@ -463,7 +463,7 @@ const Results = () => {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="final" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="stage1">
                     Stage 1 ({stats.stage_1_passed})
                   </TabsTrigger>
@@ -472,6 +472,9 @@ const Results = () => {
                   </TabsTrigger>
                   <TabsTrigger value="final">
                     Final Results ({stats.final_results})
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected">
+                    Rejected ({stats.total_candidates - stats.final_results})
                   </TabsTrigger>
                 </TabsList>
 
@@ -537,6 +540,19 @@ const Results = () => {
                     showStageInfo={true}
                   />
                 </TabsContent>
+
+                <TabsContent value="rejected" className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Candidates who were rejected during the filtering process
+                    </p>
+                  </div>
+                  <CandidateTable 
+                    candidates={results.filter(r => !r.stage_1_passed || !r.stage_2_passed)} 
+                    showStageInfo={false}
+                    showRejectionReasons={true}
+                  />
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -549,9 +565,10 @@ const Results = () => {
 interface CandidateTableProps {
   candidates: CandidateResult[];
   showStageInfo: boolean;
+  showRejectionReasons?: boolean;
 }
 
-const CandidateTable = ({ candidates, showStageInfo }: CandidateTableProps) => {
+const CandidateTable = ({ candidates, showStageInfo, showRejectionReasons = false }: CandidateTableProps) => {
   if (candidates.length === 0) {
     return (
       <div className="text-center py-12">
@@ -574,6 +591,7 @@ const CandidateTable = ({ candidates, showStageInfo }: CandidateTableProps) => {
             <TableHead>Current Company</TableHead>
             <TableHead>Previous Company</TableHead>
             {showStageInfo && <TableHead>Status</TableHead>}
+            {showRejectionReasons && <TableHead>Rejection Reasons</TableHead>}
             <TableHead>LinkedIn</TableHead>
           </TableRow>
         </TableHeader>
@@ -593,6 +611,23 @@ const CandidateTable = ({ candidates, showStageInfo }: CandidateTableProps) => {
                     <Badge variant={candidate.stage_2_passed ? "default" : "destructive"} className="text-xs">
                       S2: {candidate.stage_2_passed ? 'Pass' : 'Fail'}
                     </Badge>
+                  </div>
+                </TableCell>
+              )}
+              {showRejectionReasons && (
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {candidate.filter_reasons && candidate.filter_reasons.length > 0 ? (
+                      candidate.filter_reasons.map((reason, index) => (
+                        <Badge key={index} variant="destructive" className="text-xs">
+                          {reason}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        No specific reason
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
               )}
