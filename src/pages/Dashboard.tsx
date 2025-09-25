@@ -45,7 +45,7 @@ const Dashboard = () => {
     if (!activeUserId) return;
     
     const activeUserEmail = getActiveUserEmail();
-    const confirmRestart = window.confirm(`האם אתה בטוח שברצונך למחוק את כל הנתונים עבור ${activeUserEmail}? פעולה זו תמחק את כל הקבצים, תוצאות הסינון והגדרות הסינון.`);
+    const confirmRestart = window.confirm(`Are you sure you want to delete all data for ${activeUserEmail}? This action will delete all files, filtering results and filter settings.`);
     
     if (!confirmRestart) return;
     
@@ -64,8 +64,8 @@ const Dashboard = () => {
       ]);
       
       toast({
-        title: "איפוס הושלם בהצלחה",
-        description: `כל הנתונים נמחקו עבור ${activeUserEmail}. ניתן להתחיל מחדש.`,
+        title: "Restart completed successfully",
+        description: `All data has been deleted for ${activeUserEmail}. You can start fresh.`,
       });
       
       // Navigate to upload page to start fresh
@@ -74,8 +74,8 @@ const Dashboard = () => {
     } catch (error: any) {
       console.error('Restart error:', error);
       toast({
-        title: "שגיאת איפוס",
-        description: error.message || "נכשל במחיקת נתונים.",
+        title: "Restart Error",
+        description: error.message || "Failed to delete data.",
         variant: "destructive",
       });
     } finally {
@@ -211,13 +211,13 @@ const Dashboard = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">המשרות שלי</h2>
+                <h2 className="text-2xl font-bold">My Jobs</h2>
                 <p className="text-muted-foreground">
-                  נהל את המשרות שלך (מקסימום 10 משרות)
+                  Manage your jobs (maximum 10 jobs)
                 </p>
               </div>
               <Badge variant="outline">
-                {jobs.length}/10 משרות
+                {jobs.length}/10 jobs
               </Badge>
             </div>
 
@@ -242,14 +242,14 @@ const Dashboard = () => {
               <Card className="card-shadow">
                 <CardContent className="text-center py-12">
                   <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">אין משרות עדיין</h3>
+                  <h3 className="text-lg font-medium mb-2">No jobs yet</h3>
                   <p className="text-muted-foreground mb-4">
-                    התחל על ידי העלאת קובץ CSV עם פרטי מועמדים
+                    Start by uploading a CSV file with candidate details
                   </p>
                   <Link to="/upload">
                     <Button>
                       <Upload className="h-4 w-4" />
-                      העלה קובץ
+                      Upload File
                     </Button>
                   </Link>
                 </CardContent>
@@ -356,9 +356,9 @@ const Dashboard = () => {
                 <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
                   <RotateCcw className="h-6 w-6 text-destructive" />
                 </div>
-                <CardTitle className="text-lg text-destructive">איפוס כללי</CardTitle>
+                <CardTitle className="text-lg text-destructive">Reset All Data</CardTitle>
                 <CardDescription>
-                  מחק את כל הנתונים והתחל מחדש
+                  Clear all data and start fresh
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -374,25 +374,25 @@ const Dashboard = () => {
                       ) : (
                         <RotateCcw className="h-4 w-4" />
                       )}
-                      {isRestarting ? 'מאפס...' : 'איפוס כללי'}
+                      {isRestarting ? 'Restarting...' : 'Reset All Data'}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>איפוס כללי</AlertDialogTitle>
+                      <AlertDialogTitle>Reset All Data</AlertDialogTitle>
                       <AlertDialogDescription>
-                        האם אתה בטוח שברצונך למחוק את כל הנתונים? 
-                        פעולה זו תמחק את כל המשרות, המועמדים, תוצאות הסינון והגדרות הסינון.
-                        לא ניתן לבטל פעולה זו.
+                        Are you sure you want to delete all data? 
+                        This action will delete all jobs, candidates, filtering results and filter settings.
+                        This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>ביטול</AlertDialogCancel>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction 
                         onClick={handleRestartAll}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        איפוס כללי
+                        Reset All Data
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -405,9 +405,9 @@ const Dashboard = () => {
           <div className="grid lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 card-shadow">
               <CardHeader>
-                <CardTitle>פעילות אחרונה</CardTitle>
+                <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  פעולות סינון האחרונות שלך
+                  Your latest filtering operations
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -421,21 +421,21 @@ const Dashboard = () => {
                         <div>
                           <p className="font-medium">{job.job_name}</p>
                           <p className="text-sm text-muted-foreground">
-                            עודכן {new Date(job.updated_at).toLocaleDateString('he-IL')}
+                            Updated {new Date(job.updated_at).toLocaleDateString('en-US')}
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline">פעיל</Badge>
+                      <Badge variant="outline">Active</Badge>
                     </div>
                   ))}
                   
                   {jobs.length === 0 && (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">אין פעילות אחרונה</p>
+                      <p className="text-muted-foreground mb-4">No recent activity</p>
                       <Link to="/upload">
                         <Button variant="outline">
                           <Upload className="h-4 w-4" />
-                          העלה נתונים חדשים
+                          Upload New Data
                         </Button>
                       </Link>
                     </div>
@@ -446,9 +446,9 @@ const Dashboard = () => {
 
             <Card className="card-shadow">
               <CardHeader>
-                <CardTitle>סטטיסטיקות כלליות</CardTitle>
+                <CardTitle>Overall Stats</CardTitle>
                 <CardDescription>
-                  סקירה כללית של ביצועי הסינון שלך
+                  Overview of your filtering performance
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -457,21 +457,21 @@ const Dashboard = () => {
                     <div className="text-3xl font-bold text-primary">
                       {statsLoading ? '...' : stats.totalCandidates.toLocaleString()}
                     </div>
-                    <p className="text-sm text-muted-foreground">סך המועמדים שעובדו</p>
+                    <p className="text-sm text-muted-foreground">Total Candidates Processed</p>
                   </div>
                   
                   <div className="text-center space-y-2">
                     <div className="text-3xl font-bold text-secondary">
                       {statsLoading ? '...' : `${stats.filterAccuracy}%`}
                     </div>
-                    <p className="text-sm text-muted-foreground">דיוק סינון</p>
+                    <p className="text-sm text-muted-foreground">Filter Accuracy</p>
                   </div>
                   
                   <div className="text-center space-y-2">
                     <div className="text-3xl font-bold text-accent">
                       {statsLoading ? '...' : stats.activeJobs}
                     </div>
-                    <p className="text-sm text-muted-foreground">משרות פעילות</p>
+                    <p className="text-sm text-muted-foreground">Active Jobs</p>
                   </div>
                 </div>
               </CardContent>

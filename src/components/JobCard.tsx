@@ -29,7 +29,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
   }, [job.job_id, getJobStats]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('he-IL', {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -44,7 +44,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
             <CardTitle className="text-lg">{job.job_name}</CardTitle>
             <CardDescription className="flex items-center space-x-2">
               <Calendar className="h-4 w-4" />
-              <span>נוצר {formatDate(job.created_at)}</span>
+              <span>Created {formatDate(job.created_at)}</span>
             </CardDescription>
           </div>
           <AlertDialog>
@@ -55,19 +55,19 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>מחיקת משרה</AlertDialogTitle>
+                <AlertDialogTitle>Delete Job</AlertDialogTitle>
                 <AlertDialogDescription>
-                  האם אתה בטוח שברצונך למחוק את המשרה "{job.job_name}"? 
-                  פעולה זו תמחק את כל הנתונים הקשורים למשרה זו ולא ניתן לבטלה.
+                  Are you sure you want to delete the job "{job.job_name}"? 
+                  This action will delete all data related to this job and cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>ביטול</AlertDialogCancel>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={() => onDelete(job.job_id)}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  מחק
+                  Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -81,26 +81,26 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
             <div className="text-2xl font-bold text-primary">
               {statsLoading ? '...' : stats.totalCandidates}
             </div>
-            <p className="text-xs text-muted-foreground">מועמדים כולל</p>
+            <p className="text-xs text-muted-foreground">Total Candidates</p>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-secondary">
               {statsLoading ? '...' : stats.processedCandidates}
             </div>
-            <p className="text-xs text-muted-foreground">עובדו</p>
+            <p className="text-xs text-muted-foreground">Processed</p>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-accent">
               {statsLoading ? '...' : stats.finalResults}
             </div>
-            <p className="text-xs text-muted-foreground">תוצאות סופיות</p>
+            <p className="text-xs text-muted-foreground">Final Results</p>
           </div>
         </div>
 
         {/* Status Badge */}
         <div className="flex justify-center">
           <Badge variant={stats.processedCandidates > 0 ? "default" : "secondary"}>
-            {stats.processedCandidates > 0 ? "פעיל" : "ממתין"}
+            {stats.processedCandidates > 0 ? "Active" : "Waiting"}
           </Badge>
         </div>
 
@@ -109,13 +109,13 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
           <Link to="/results" className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               <BarChart3 className="h-4 w-4" />
-              תוצאות
+              Results
             </Button>
           </Link>
           <Link to="/filter-config" className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               <Filter className="h-4 w-4" />
-              הגדרות
+              Settings
             </Button>
           </Link>
         </div>
