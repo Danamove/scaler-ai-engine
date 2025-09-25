@@ -10,12 +10,24 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
+interface DashboardStats {
+  totalCandidates: number;
+  filterAccuracy: number;
+  activeJobs: number;
+}
+
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isRestarting, setIsRestarting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalCandidates: 0,
+    filterAccuracy: 0,
+    activeJobs: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
 
   const handleRestart = async () => {
@@ -60,6 +72,54 @@ const Dashboard = () => {
     }
   };
 
+  const fetchDashboardStats = async () => {
+    const activeUserId = getActiveUserId();
+    if (!activeUserId) return;
+
+    setStatsLoading(true);
+    try {
+      // Fetch total candidates processed
+      const { count: totalCandidates } = await supabase
+        .from('raw_data')
+        .select('*', { count: 'exact' })
+        .eq('user_id', activeUserId);
+
+      // Fetch filtered results for accuracy calculation
+      const { data: filteredResults } = await supabase
+        .from('filtered_results')
+        .select('stage_1_passed, stage_2_passed')
+        .eq('user_id', activeUserId);
+
+      // Calculate filter accuracy
+      let filterAccuracy = 0;
+      if (filteredResults && filteredResults.length > 0) {
+        const passedCandidates = filteredResults.filter(result => 
+          result.stage_1_passed && result.stage_2_passed
+        ).length;
+        filterAccuracy = Math.round((passedCandidates / filteredResults.length) * 100);
+      }
+
+      // Fetch unique job IDs (active jobs)
+      const { data: jobIds } = await supabase
+        .from('filter_rules')
+        .select('job_id')
+        .eq('user_id', activeUserId);
+
+      const uniqueJobIds = new Set(jobIds?.map(row => row.job_id) || []);
+      const activeJobs = uniqueJobIds.size;
+
+      setStats({
+        totalCandidates: totalCandidates || 0,
+        filterAccuracy,
+        activeJobs
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
@@ -75,8 +135,9 @@ const Dashboard = () => {
     
     if (user) {
       checkAdminStatus();
+      fetchDashboardStats();
     }
-  }, [user]);
+  }, [user, getActiveUserId]);
 
   if (loading) {
     return (
@@ -307,17 +368,23 @@ const Dashboard = () => {
               <CardContent>
                 <div className="space-y-6">
                   <div className="text-center space-y-2">
-                    <div className="text-3xl font-bold text-primary">1,247</div>
+                    <div className="text-3xl font-bold text-primary">
+                      {statsLoading ? '...' : stats.totalCandidates.toLocaleString()}
+                    </div>
                     <p className="text-sm text-muted-foreground">Total Candidates Processed</p>
                   </div>
                   
                   <div className="text-center space-y-2">
-                    <div className="text-3xl font-bold text-secondary">89%</div>
+                    <div className="text-3xl font-bold text-secondary">
+                      {statsLoading ? '...' : `${stats.filterAccuracy}%`}
+                    </div>
                     <p className="text-sm text-muted-foreground">Filter Accuracy</p>
                   </div>
                   
                   <div className="text-center space-y-2">
-                    <div className="text-3xl font-bold text-accent">12</div>
+                    <div className="text-3xl font-bold text-accent">
+                      {statsLoading ? '...' : stats.activeJobs}
+                    </div>
                     <p className="text-sm text-muted-foreground">Active Jobs</p>
                   </div>
                 </div>
