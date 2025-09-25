@@ -221,6 +221,85 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Netly Integration Section */}
+      <section className="py-20 bg-secondary/5">
+        <div className="container mx-auto px-4">
+          <div className="text-center space-y-4 mb-16">
+            <Badge variant="outline" className="mb-4">
+              Netly Integration
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold">
+              Advanced Profile Cross-Checking
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Upload additional Netly files to identify overlapping profiles and enhance your filtering results
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold">Profile Comparison</h3>
+                </div>
+                <p className="text-muted-foreground">
+                  Cross-reference your filtered candidates with existing Netly files to identify potential overlaps and duplicates.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-secondary/10 rounded-full flex items-center justify-center">
+                    <Users className="h-4 w-4 text-secondary" />
+                  </div>
+                  <h3 className="text-lg font-semibold">Smart Detection</h3>
+                </div>
+                <p className="text-muted-foreground">
+                  Our intelligent matching algorithm identifies overlapping profiles based on names and additional candidate data.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-accent/10 rounded-full flex items-center justify-center">
+                    <BarChart3 className="h-4 w-4 text-accent" />
+                  </div>
+                  <h3 className="text-lg font-semibold">Separate Exports</h3>
+                </div>
+                <p className="text-muted-foreground">
+                  Get dedicated CSV exports for overlapping profiles, allowing you to manage and track candidate relationships effectively.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-card p-8 rounded-lg border card-shadow">
+              <h4 className="text-xl font-semibold mb-4">Netly Integration Benefits</h4>
+              <ul className="space-y-3">
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-secondary flex-shrink-0" />
+                  <span>Prevent duplicate outreach</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-secondary flex-shrink-0" />
+                  <span>Maintain relationship history</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-secondary flex-shrink-0" />
+                  <span>Enhanced candidate tracking</span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <CheckCircle className="h-5 w-5 text-secondary flex-shrink-0" />
+                  <span>Streamlined workflow management</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
@@ -243,9 +322,12 @@ const Index = () => {
                   Start Filtering Now
                 </Button>
               </Link>
-              <Button variant="outline" size="xl">
-                Request Demo
-              </Button>
+              <Link to="/auth">
+                <Button variant="outline" size="xl">
+                  <FileText className="h-5 w-5" />
+                  Access Netly Integration
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
