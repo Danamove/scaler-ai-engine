@@ -180,6 +180,14 @@ const Dashboard = () => {
                 Viewing: {impersonatedUser.email}
               </Badge>
             )}
+            {isAdmin && (
+              <Link to="/admin-panel">
+                <Button variant="ghost" size="sm">
+                  <Users className="h-4 w-4" />
+                  Admin Panel
+                </Button>
+              </Link>
+            )}
             <Badge variant="secondary">
               {user.email}
             </Badge>
@@ -349,76 +357,105 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {isAdmin && (
-              <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
+            {isAdmin ? (
+              <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer border-destructive/20">
                 <CardHeader className="pb-4">
-                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                    <Users className="h-6 w-6 text-primary" />
+                  <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
+                    <RotateCcw className="h-6 w-6 text-destructive" />
                   </div>
-                  <CardTitle className="text-lg">Admin Panel</CardTitle>
+                  <CardTitle className="text-lg text-destructive">Reset All Data</CardTitle>
                   <CardDescription>
-                    Manage companies, synonyms, users and API costs
+                    Clear all data and start fresh
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Link to="/admin-panel">
-                    <Button variant="outline" className="w-full">
-                      <Users className="h-4 w-4" />
-                      Admin Dashboard
-                    </Button>
-                  </Link>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        className="w-full"
+                        disabled={isRestarting}
+                      >
+                        {isRestarting ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        {isRestarting ? 'Restarting...' : 'Reset All Data'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Reset All Data</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete all data? 
+                          This action will delete all jobs, candidates, filtering results and filter settings.
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleRestartAll}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Reset All Data
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer border-destructive/20">
+                <CardHeader className="pb-4">
+                  <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
+                    <RotateCcw className="h-6 w-6 text-destructive" />
+                  </div>
+                  <CardTitle className="text-lg text-destructive">Reset All Data</CardTitle>
+                  <CardDescription>
+                    Clear all data and start fresh
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        className="w-full"
+                        disabled={isRestarting}
+                      >
+                        {isRestarting ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        {isRestarting ? 'Restarting...' : 'Reset All Data'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Reset All Data</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete all data? 
+                          This action will delete all jobs, candidates, filtering results and filter settings.
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleRestartAll}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Reset All Data
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </CardContent>
               </Card>
             )}
-
-            <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer border-destructive/20">
-              <CardHeader className="pb-4">
-                <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
-                  <RotateCcw className="h-6 w-6 text-destructive" />
-                </div>
-                <CardTitle className="text-lg text-destructive">Reset All Data</CardTitle>
-                <CardDescription>
-                  Clear all data and start fresh
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      className="w-full"
-                      disabled={isRestarting}
-                    >
-                      {isRestarting ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <RotateCcw className="h-4 w-4" />
-                      )}
-                      {isRestarting ? 'Restarting...' : 'Reset All Data'}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Reset All Data</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete all data? 
-                        This action will delete all jobs, candidates, filtering results and filter settings.
-                        This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleRestartAll}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Reset All Data
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Recent Activity & Stats */}
