@@ -60,25 +60,43 @@ const Results = () => {
     try {
       setLoadingResults(true);
 
-      // Get filtered results with raw data
-      const { data: filteredResults, error } = await supabase
-        .from('filtered_results')
-        .select(`
-          *,
-          raw_data (
-            id,
-            full_name,
-            current_title,
-            current_company,
-            previous_company,
-            linkedin_url,
-            profile_summary
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Get all filtered results with pagination to handle large datasets
+      let allResults = [];
+      let hasMore = true;
+      let offset = 0;
+      const pageSize = 1000;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: resultsPage, error } = await supabase
+          .from('filtered_results')
+          .select(`
+            *,
+            raw_data (
+              id,
+              full_name,
+              current_title,
+              current_company,
+              previous_company,
+              linkedin_url,
+              profile_summary
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) throw error;
+
+        if (resultsPage && resultsPage.length > 0) {
+          allResults.push(...resultsPage);
+          offset += pageSize;
+          hasMore = resultsPage.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const filteredResults = allResults;
 
       // Transform data for display
       const transformedResults: CandidateResult[] = filteredResults?.map((result: any) => ({
