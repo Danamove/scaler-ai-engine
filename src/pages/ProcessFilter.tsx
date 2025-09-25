@@ -224,59 +224,114 @@ const ProcessFilter = () => {
 
         if (stage1Pass) stage1Passed++;
 
-        // STAGE 2: User Rules Filtering (only if passed Stage 1)
+        // STAGE 2: AI-Enhanced User Rules Filtering (only if passed Stage 1)
         if (stage1Pass) {
-          stage2Pass = true; // Start with true, will become false if any criteria fails
-          
-          // Check minimum experience
-          if (candidate.years_of_experience < filterRules.min_years_experience) {
-            stage2Pass = false;
-            filterReasons.push(`Less than ${filterRules.min_years_experience} years experience`);
-          }
-
-          // Check minimum months in current role
-          if (stage2Pass && candidate.months_in_current_role < filterRules.min_months_current_role) {
-            stage2Pass = false;
-            filterReasons.push(`Less than ${filterRules.min_months_current_role} months in current role`);
-          }
-
-          // Check exclude terms
-          if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-            const currentTitle = candidate.current_title?.toLowerCase() || '';
-            const hasExcludedTerm = filterRules.exclude_terms.some((term: string) => 
-              currentTitle.includes(term.toLowerCase())
+          try {
+            // Call AI analysis function for semantic evaluation
+            const { data: aiAnalysis, error: aiError } = await supabase.functions.invoke(
+              'analyze-candidate-profile', 
+              {
+                body: {
+                  candidate,
+                  filterRules
+                }
+              }
             );
-            if (hasExcludedTerm) {
+
+            if (aiError) {
+              console.error('AI Analysis error:', aiError);
+              // Fallback to basic filtering if AI fails
+              stage2Pass = true;
+              
+              // Basic checks as fallback
+              if (candidate.years_of_experience < filterRules.min_years_experience) {
+                stage2Pass = false;
+                filterReasons.push(`Less than ${filterRules.min_years_experience} years experience`);
+              }
+
+              if (stage2Pass && candidate.months_in_current_role < filterRules.min_months_current_role) {
+                stage2Pass = false;
+                filterReasons.push(`Less than ${filterRules.min_months_current_role} months in current role`);
+              }
+
+              // Basic exclude terms check
+              if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+                const currentTitle = candidate.current_title?.toLowerCase() || '';
+                const hasExcludedTerm = filterRules.exclude_terms.some((term: string) => 
+                  currentTitle.includes(term.toLowerCase())
+                );
+                if (hasExcludedTerm) {
+                  stage2Pass = false;
+                  filterReasons.push('Contains excluded term');
+                }
+              }
+
+              // Basic must have terms check
+              if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+                const profileText = `${candidate.current_title} ${candidate.profile_summary}`.toLowerCase();
+                const hasMustHaveTerm = filterRules.must_have_terms.some((term: string) => 
+                  profileText.includes(term.toLowerCase())
+                );
+                if (!hasMustHaveTerm) {
+                  stage2Pass = false;
+                  filterReasons.push('Missing required terms');
+                }
+              }
+
+              // Basic required titles check
+              if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
+                const currentTitle = candidate.current_title?.toLowerCase() || '';
+                const hasRequiredTitle = filterRules.required_titles.some((title: string) => 
+                  currentTitle.includes(title.toLowerCase())
+                );
+                if (!hasRequiredTitle) {
+                  stage2Pass = false;
+                  filterReasons.push('Title not in required list');
+                }
+              }
+
+            } else if (aiAnalysis) {
+              // Use AI analysis results
+              console.log(`AI Analysis for ${candidate.full_name}:`, aiAnalysis);
+              
+              stage2Pass = (
+                aiAnalysis.passes_experience_check &&
+                aiAnalysis.passes_role_duration_check &&
+                aiAnalysis.passes_must_have_check &&
+                aiAnalysis.passes_exclude_check &&
+                aiAnalysis.passes_title_check
+              );
+
+              // Add detailed AI-based reasons
+              if (!aiAnalysis.passes_experience_check) {
+                filterReasons.push(`AI: Insufficient experience (estimated ${aiAnalysis.estimated_years_experience} years)`);
+              }
+              if (!aiAnalysis.passes_role_duration_check) {
+                filterReasons.push(`AI: Insufficient role duration (estimated ${aiAnalysis.estimated_months_in_role} months)`);
+              }
+              if (!aiAnalysis.passes_must_have_check) {
+                filterReasons.push(`AI: Low must-have terms match (score: ${aiAnalysis.must_have_score}%)`);
+              }
+              if (!aiAnalysis.passes_exclude_check) {
+                filterReasons.push(`AI: High exclude terms match (score: ${aiAnalysis.exclude_terms_score}%)`);
+              }
+              if (!aiAnalysis.passes_title_check) {
+                filterReasons.push(`AI: Poor title match (score: ${aiAnalysis.title_match_score}%)`);
+              }
+            }
+
+          } catch (aiCallError) {
+            console.error('Failed to call AI analysis:', aiCallError);
+            // Continue with basic filtering as fallback
+            stage2Pass = true;
+            
+            if (candidate.years_of_experience < filterRules.min_years_experience) {
               stage2Pass = false;
-              filterReasons.push('Contains excluded term');
+              filterReasons.push(`Less than ${filterRules.min_years_experience} years experience`);
             }
           }
 
-          // Check must have terms
-          if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-            const profileText = `${candidate.current_title} ${candidate.profile_summary}`.toLowerCase();
-            const hasMustHaveTerm = filterRules.must_have_terms.some((term: string) => 
-              profileText.includes(term.toLowerCase())
-            );
-            if (!hasMustHaveTerm) {
-              stage2Pass = false;
-              filterReasons.push('Missing required terms');
-            }
-          }
-
-          // Check required titles
-          if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
-            const currentTitle = candidate.current_title?.toLowerCase() || '';
-            const hasRequiredTitle = filterRules.required_titles.some((title: string) => 
-              currentTitle.includes(title.toLowerCase())
-            );
-            if (!hasRequiredTitle) {
-              stage2Pass = false;
-              filterReasons.push('Title not in required list');
-            }
-          }
-
-          // Check top university requirement
+          // Check top university requirement (keep this separate as it's not AI-enhanced yet)
           if (stage2Pass && filterRules.require_top_uni) {
             const { data: topUniversities } = await supabase
               .from('top_universities')

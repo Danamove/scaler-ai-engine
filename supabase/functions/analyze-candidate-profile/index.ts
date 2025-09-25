@@ -1,0 +1,196 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface CandidateProfile {
+  current_title: string;
+  profile_summary: string;
+  education: string;
+  years_of_experience: number;
+  months_in_current_role: number;
+}
+
+interface FilterRules {
+  min_years_experience: number;
+  min_months_current_role: number;
+  must_have_terms: string[];
+  exclude_terms: string[];
+  required_titles: string[];
+}
+
+interface AnalysisResult {
+  estimated_years_experience: number;
+  estimated_months_in_role: number;
+  education_level: string;
+  must_have_score: number;
+  exclude_terms_score: number;
+  title_match_score: number;
+  passes_experience_check: boolean;
+  passes_role_duration_check: boolean;
+  passes_must_have_check: boolean;
+  passes_exclude_check: boolean;
+  passes_title_check: boolean;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key not found');
+    }
+
+    const { candidate, filterRules } = await req.json();
+    console.log('Analyzing candidate:', candidate.current_title);
+
+    // Create comprehensive text for analysis
+    const candidateText = `
+      Current Title: ${candidate.current_title || ''}
+      Profile Summary: ${candidate.profile_summary || ''}
+      Education: ${candidate.education || ''}
+      Years of Experience: ${candidate.years_of_experience || 0}
+      Months in Current Role: ${candidate.months_in_current_role || 0}
+    `.trim();
+
+    // Get embeddings for candidate profile
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: candidateText,
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`);
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    const candidateEmbedding = embeddingData.data[0].embedding;
+
+    // Use GPT to analyze the candidate profile with structured output
+    const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert HR analyst. Analyze candidate profiles and provide structured assessments.
+            
+            Always respond with ONLY valid JSON in this exact format:
+            {
+              "estimated_years_experience": number,
+              "estimated_months_in_role": number,
+              "education_level": "bachelor" | "master" | "phd" | "diploma" | "none",
+              "must_have_score": number,
+              "exclude_terms_score": number,
+              "title_match_score": number
+            }
+            
+            Scoring guidelines:
+            - must_have_score: 0-100, how well the candidate matches required terms
+            - exclude_terms_score: 0-100, how much the candidate matches excluded terms (lower is better)
+            - title_match_score: 0-100, how well the title matches required titles
+            
+            Base your analysis on semantic meaning, not just keyword matching.`
+          },
+          {
+            role: 'user',
+            content: `Analyze this candidate profile:
+            
+            ${candidateText}
+            
+            Filter Requirements:
+            - Minimum years experience: ${filterRules.min_years_experience}
+            - Minimum months in current role: ${filterRules.min_months_current_role}
+            - Must have terms: ${filterRules.must_have_terms?.join(', ') || 'none'}
+            - Exclude terms: ${filterRules.exclude_terms?.join(', ') || 'none'}
+            - Required titles: ${filterRules.required_titles?.join(', ') || 'none'}
+            
+            Provide semantic analysis considering:
+            1. Infer actual experience from role progression and description
+            2. Estimate time in current role from context clues
+            3. Assess education level from degrees mentioned
+            4. Score semantic similarity to must-have terms (not just keywords)
+            5. Score presence of exclude terms (considering context)
+            6. Score title match considering role seniority and domain`
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!analysisResponse.ok) {
+      throw new Error(`OpenAI Analysis API error: ${analysisResponse.statusText}`);
+    }
+
+    const analysisData = await analysisResponse.json();
+    const analysisText = analysisData.choices[0].message.content.trim();
+    
+    console.log('Raw analysis response:', analysisText);
+    
+    // Parse the JSON response
+    let analysis;
+    try {
+      analysis = JSON.parse(analysisText);
+    } catch (parseError) {
+      console.error('Failed to parse JSON:', analysisText);
+      throw new Error('Invalid JSON response from analysis');
+    }
+
+    // Apply business logic based on AI analysis
+    const result: AnalysisResult = {
+      estimated_years_experience: analysis.estimated_years_experience,
+      estimated_months_in_role: analysis.estimated_months_in_role,
+      education_level: analysis.education_level,
+      must_have_score: analysis.must_have_score,
+      exclude_terms_score: analysis.exclude_terms_score,
+      title_match_score: analysis.title_match_score,
+      
+      // Pass/fail determinations
+      passes_experience_check: analysis.estimated_years_experience >= filterRules.min_years_experience,
+      passes_role_duration_check: analysis.estimated_months_in_role >= filterRules.min_months_current_role,
+      passes_must_have_check: filterRules.must_have_terms?.length > 0 ? analysis.must_have_score >= 70 : true,
+      passes_exclude_check: filterRules.exclude_terms?.length > 0 ? analysis.exclude_terms_score <= 30 : true,
+      passes_title_check: filterRules.required_titles?.length > 0 ? analysis.title_match_score >= 60 : true,
+    };
+
+    console.log('Analysis result:', result);
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in analyze-candidate-profile function:', error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      passes_experience_check: false,
+      passes_role_duration_check: false,
+      passes_must_have_check: false,
+      passes_exclude_check: false,
+      passes_title_check: false
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
