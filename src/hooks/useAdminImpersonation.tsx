@@ -34,7 +34,10 @@ const ALLOWED_USERS = [
   'chen@added-value.co.il', 
   'alex@added-value.co.il',
   'katinka@added-value.co.il',
-  'mikaka@added-value.co.il'
+  'mikaka@added-value.co.il',
+  'danana@added-value.co.il',
+  'andreas@added-value.co.il',
+  'eszterz@added-value.co.il'
 ];
 
 export const AdminImpersonationProvider = ({ children }: AdminImpersonationProviderProps) => {
