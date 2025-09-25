@@ -99,10 +99,12 @@ const Dashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="secondary" className="w-full">
-                  <Settings className="h-4 w-4" />
-                  Configure
-                </Button>
+                <Link to="/filter-config">
+                  <Button variant="secondary" className="w-full">
+                    <Settings className="h-4 w-4" />
+                    Configure
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
