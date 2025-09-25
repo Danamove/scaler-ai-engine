@@ -37,10 +37,10 @@ const Index = () => {
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" />
         <div className="container mx-auto px-4 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
+          <div className="grid lg:grid-cols-1 gap-12 items-center justify-center text-center">
+            <div className="space-y-8 max-w-4xl mx-auto">
               <div className="space-y-4">
-                <Badge variant="outline" className="w-fit">
+                <Badge variant="outline" className="w-fit mx-auto">
                   🚀 AI-Powered Filtering
                 </Badge>
                 <h1 className="text-4xl md:text-6xl font-bold leading-tight">
@@ -50,12 +50,12 @@ const Index = () => {
                     Filtering System
                   </span>
                 </h1>
-                <p className="text-xl text-muted-foreground max-w-2xl">
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                   Filter candidate profiles with precision using built-in rules and dynamic filtering. 
                   Streamline your recruitment process with enterprise-grade tools.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/auth">
                   <Button variant="hero" size="xl">
                     <Upload className="h-5 w-5" />
@@ -69,7 +69,7 @@ const Index = () => {
                   </Button>
                 </Link>
               </div>
-              <div className="flex items-center gap-8 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-secondary" />
                   Multi-stage filtering
@@ -82,16 +82,6 @@ const Index = () => {
                   <CheckCircle className="h-4 w-4 text-secondary" />
                   Real-time results
                 </div>
-              </div>
-            </div>
-            <div className="lg:pl-8">
-              <div className="relative">
-                <img 
-                  src={heroImage} 
-                  alt="Filterly System Dashboard" 
-                  className="rounded-xl card-shadow w-full h-auto"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/20 to-transparent rounded-xl" />
               </div>
             </div>
           </div>
