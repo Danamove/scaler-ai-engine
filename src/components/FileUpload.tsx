@@ -49,24 +49,85 @@ export const FileUpload = ({
   };
 
   const parseCSV = (text: string): any[] => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
+    try {
+      // More robust CSV parsing that handles quoted fields and multiline content
+      const lines = text.split('\n');
+      if (lines.length === 0) return [];
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-    const data = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-      if (values.length === headers.length) {
-        const row: any = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-        data.push(row);
+      // Get headers from first line
+      const headerLine = lines[0];
+      const headers = [];
+      let currentField = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < headerLine.length; i++) {
+        const char = headerLine[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          headers.push(currentField.trim().replace(/^"|"$/g, ''));
+          currentField = '';
+        } else {
+          currentField += char;
+        }
       }
-    }
+      headers.push(currentField.trim().replace(/^"|"$/g, ''));
 
-    return data;
+      const data = [];
+      let i = 1;
+      
+      while (i < lines.length) {
+        const values = [];
+        let currentValue = '';
+        let inQuotes = false;
+        let lineIndex = i;
+        
+        // Parse the current row, potentially spanning multiple lines
+        while (lineIndex < lines.length) {
+          const line = lines[lineIndex];
+          
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              values.push(currentValue.trim().replace(/^"|"$/g, ''));
+              currentValue = '';
+            } else {
+              currentValue += char;
+            }
+          }
+          
+          // If we're not in quotes, this row is complete
+          if (!inQuotes) {
+            values.push(currentValue.trim().replace(/^"|"$/g, ''));
+            break;
+          } else {
+            // Add newline and continue to next line
+            currentValue += '\n';
+          }
+          
+          lineIndex++;
+        }
+        
+        // Only add row if it has the expected number of fields
+        if (values.length === headers.length && values.some(v => v.length > 0)) {
+          const row: any = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || '';
+          });
+          data.push(row);
+        }
+        
+        i = lineIndex + 1;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('CSV parsing error:', error);
+      return [];
+    }
   };
 
   const saveToDatabase = async (data: any[]) => {
