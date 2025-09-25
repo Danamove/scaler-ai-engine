@@ -56,7 +56,7 @@ export const FileUpload = ({
           header: true,
           skipEmptyLines: 'greedy',
           dynamicTyping: false,
-          worker: true,
+          worker: false,
           transformHeader: (h: string) => h.trim(),
           complete: (results) => {
             const rows = (results.data as any[]).filter((row) =>
@@ -119,12 +119,21 @@ export const FileUpload = ({
         };
       });
 
-      // Insert in chunks to handle large files reliably
-      const chunkSize = 500;
-      for (let i = 0; i < rawDataRecords.length; i += chunkSize) {
+      // Insert in small chunks to handle very large files and avoid payload limits
+      const total = rawDataRecords.length;
+      const chunkSize = 100;
+      for (let i = 0; i < total; i += chunkSize) {
         const chunk = rawDataRecords.slice(i, i + chunkSize);
         const { error } = await supabase.from('raw_data').insert(chunk);
-        if (error) throw error;
+        if (error) {
+          console.error('Chunk insert error at index', i, error);
+          throw error;
+        }
+        // Update progress smoothly between 95% and 99%
+        const progressWithinSave = 95 + Math.min(4, Math.floor(((i + chunk.length) / total) * 5));
+        setUploadProgress(progressWithinSave);
+        // Tiny delay to prevent rate limiting and keep UI responsive
+        await new Promise((res) => setTimeout(res, 50));
       }
 
       toast({
