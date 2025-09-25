@@ -121,9 +121,13 @@ const ProcessFilter = () => {
 
       console.log(`Found ${candidates.length} candidates and filter rules:`, filterRules);
 
-      // Get built-in lists if needed
-      setCurrentStep('Loading built-in lists...');
+      // Get built-in lists and synonyms
+      setCurrentStep('Loading built-in lists and synonyms...');
       setProgress(20);
+
+      const { data: synonyms } = await supabase
+        .from('synonyms')
+        .select('*');
 
       const { data: notRelevantCompanies } = await supabase
         .from('not_relevant_companies')
@@ -147,11 +151,53 @@ const ProcessFilter = () => {
         .eq('job_id', filterRules.job_id);
 
       console.log('Loaded lists:', {
+        synonyms: synonyms?.length || 0,
         notRelevantCompanies: notRelevantCompanies?.length || 0,
         targetCompanies: targetCompanies?.length || 0,
         blacklistCompanies: blacklistCompanies?.length || 0,
         pastCandidates: pastCandidates?.length || 0
       });
+
+      // Create synonym helper functions
+      const createSynonymMap = (category: string) => {
+        const synonymMap = new Map<string, string[]>();
+        synonyms?.filter(s => s.category === category).forEach(s => {
+          const canonical = s.canonical_term.toLowerCase();
+          const variant = s.variant_term.toLowerCase();
+          
+          if (!synonymMap.has(canonical)) {
+            synonymMap.set(canonical, [canonical]);
+          }
+          synonymMap.get(canonical)!.push(variant);
+          
+          // Also create reverse mapping
+          if (!synonymMap.has(variant)) {
+            synonymMap.set(variant, [canonical]);
+          }
+          synonymMap.get(variant)!.push(canonical);
+        });
+        return synonymMap;
+      };
+
+      const titleSynonyms = createSynonymMap('title');
+      const skillSynonyms = createSynonymMap('skill');
+
+      const expandTermsWithSynonyms = (terms: string[], synonymMap: Map<string, string[]>) => {
+        const expandedTerms = new Set<string>();
+        terms.forEach(term => {
+          const lowerTerm = term.toLowerCase();
+          expandedTerms.add(lowerTerm);
+          const synonyms = synonymMap.get(lowerTerm) || [];
+          synonyms.forEach(syn => expandedTerms.add(syn));
+        });
+        return Array.from(expandedTerms);
+      };
+
+      const checkTermMatch = (text: string, terms: string[], synonymMap: Map<string, string[]>) => {
+        const expandedTerms = expandTermsWithSynonyms(terms, synonymMap);
+        const lowerText = text.toLowerCase();
+        return expandedTerms.some(term => lowerText.includes(term));
+      };
 
       // Clear existing results for this job
       const { error: deleteError } = await supabase
@@ -179,44 +225,54 @@ const ProcessFilter = () => {
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
         let stage1Pass = true;
-        let stage2Pass = false; // Stage 2 starts as false, only becomes true if stage 1 passes AND stage 2 criteria are met
+        let stage2Pass = false;
         const filterReasons = [];
 
-        // STAGE 1: Company & Lists Filtering
+        // STAGE 1: Company & Lists Filtering - Check in specific order to get accurate reasons
         
-        // Check blacklist (current company only)
+        // Check blacklist first (current company only)
         const blacklist = blacklistCompanies?.map(b => b.company_name.toLowerCase()) || [];
-        if (blacklist.includes(candidate.current_company?.toLowerCase())) {
+        if (candidate.current_company && blacklist.includes(candidate.current_company.toLowerCase())) {
           stage1Pass = false;
           filterReasons.push('Blacklisted company');
         }
 
         // Check past candidates
-        const pastCandidateNames = pastCandidates?.map(p => p.candidate_name.toLowerCase()) || [];
-        if (pastCandidateNames.includes(candidate.full_name?.toLowerCase())) {
-          stage1Pass = false;
-          filterReasons.push('Past candidate');
+        if (stage1Pass) {
+          const pastCandidateNames = pastCandidates?.map(p => p.candidate_name.toLowerCase()) || [];
+          if (candidate.full_name && pastCandidateNames.includes(candidate.full_name.toLowerCase())) {
+            stage1Pass = false;
+            filterReasons.push('Past candidate');
+          }
         }
 
         // Check NotRelevant companies (if enabled)
-        if (filterRules.use_not_relevant_filter && stage1Pass) {
+        if (stage1Pass && filterRules.use_not_relevant_filter) {
           const notRelevantList = notRelevantCompanies?.map(c => c.company_name.toLowerCase()) || [];
-          const currentCompany = candidate.current_company?.toLowerCase();
-          const previousCompany = candidate.previous_company?.toLowerCase();
+          const currentCompany = candidate.current_company?.toLowerCase() || '';
+          const previousCompany = candidate.previous_company?.toLowerCase() || '';
           
-          if (notRelevantList.includes(currentCompany) || notRelevantList.includes(previousCompany)) {
+          if (notRelevantList.some(company => 
+            currentCompany.includes(company) || previousCompany.includes(company) ||
+            company.includes(currentCompany) || company.includes(previousCompany)
+          )) {
             stage1Pass = false;
             filterReasons.push('NotRelevant company');
           }
         }
 
         // Check Target companies (if enabled)
-        if (filterRules.use_target_companies_filter && stage1Pass) {
+        if (stage1Pass && filterRules.use_target_companies_filter) {
           const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
-          const currentCompany = candidate.current_company?.toLowerCase();
-          const previousCompany = candidate.previous_company?.toLowerCase();
+          const currentCompany = candidate.current_company?.toLowerCase() || '';
+          const previousCompany = candidate.previous_company?.toLowerCase() || '';
           
-          if (!targetList.includes(currentCompany) && !targetList.includes(previousCompany)) {
+          const hasTargetCompany = targetList.some(company => 
+            currentCompany.includes(company) || previousCompany.includes(company) ||
+            company.includes(currentCompany) || company.includes(previousCompany)
+          );
+          
+          if (!hasTargetCompany) {
             stage1Pass = false;
             filterReasons.push('Not in target companies');
           }
@@ -234,58 +290,55 @@ const ProcessFilter = () => {
                 body: {
                   candidate,
                   filterRules,
-                  userId: user.id
+                  userId: user.id,
+                  synonyms: synonyms || []
                 }
               }
             );
 
             if (aiError) {
               console.error('AI Analysis error:', aiError);
-              // Fallback to basic filtering if AI fails
+              // Fallback to enhanced basic filtering with synonyms
               stage2Pass = true;
               
-              // Basic checks as fallback
-              if (candidate.years_of_experience < filterRules.min_years_experience) {
+              // Enhanced experience check
+              const experienceFromProfile = candidate.years_of_experience || 0;
+              if (experienceFromProfile < filterRules.min_years_experience) {
                 stage2Pass = false;
-                filterReasons.push(`Less than ${filterRules.min_years_experience} years experience`);
+                filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
               }
 
-              if (stage2Pass && candidate.months_in_current_role < filterRules.min_months_current_role) {
-                stage2Pass = false;
-                filterReasons.push(`Less than ${filterRules.min_months_current_role} months in current role`);
-              }
-
-              // Basic exclude terms check
-              if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-                const currentTitle = candidate.current_title?.toLowerCase() || '';
-                const hasExcludedTerm = filterRules.exclude_terms.some((term: string) => 
-                  currentTitle.includes(term.toLowerCase())
-                );
-                if (hasExcludedTerm) {
+              // Enhanced role duration check
+              if (stage2Pass) {
+                const currentRoleDuration = candidate.months_in_current_role || 0;
+                if (currentRoleDuration < filterRules.min_months_current_role) {
                   stage2Pass = false;
-                  filterReasons.push('Contains excluded term');
+                  filterReasons.push(`Insufficient role duration: ${currentRoleDuration} months (required: ${filterRules.min_months_current_role})`);
                 }
               }
 
-              // Basic must have terms check
+              // Enhanced exclude terms check with synonyms
+              if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+                const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
+                if (checkTermMatch(profileText, filterRules.exclude_terms, skillSynonyms)) {
+                  stage2Pass = false;
+                  filterReasons.push('Contains excluded terms');
+                }
+              }
+
+              // Enhanced must have terms check with synonyms
               if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-                const profileText = `${candidate.current_title} ${candidate.profile_summary}`.toLowerCase();
-                const hasMustHaveTerm = filterRules.must_have_terms.some((term: string) => 
-                  profileText.includes(term.toLowerCase())
-                );
-                if (!hasMustHaveTerm) {
+                const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
+                if (!checkTermMatch(profileText, filterRules.must_have_terms, skillSynonyms)) {
                   stage2Pass = false;
                   filterReasons.push('Missing required terms');
                 }
               }
 
-              // Basic required titles check
+              // Enhanced required titles check with synonyms
               if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
-                const currentTitle = candidate.current_title?.toLowerCase() || '';
-                const hasRequiredTitle = filterRules.required_titles.some((title: string) => 
-                  currentTitle.includes(title.toLowerCase())
-                );
-                if (!hasRequiredTitle) {
+                const currentTitle = candidate.current_title || '';
+                if (!checkTermMatch(currentTitle, filterRules.required_titles, titleSynonyms)) {
                   stage2Pass = false;
                   filterReasons.push('Title not in required list');
                 }
@@ -303,36 +356,37 @@ const ProcessFilter = () => {
                 aiAnalysis.passes_title_check
               );
 
-              // Add detailed AI-based reasons
+              // Add detailed AI-based reasons with actual values
               if (!aiAnalysis.passes_experience_check) {
-                filterReasons.push(`AI: Insufficient experience (estimated ${aiAnalysis.estimated_years_experience} years)`);
+                filterReasons.push(`Insufficient experience: AI estimated ${aiAnalysis.estimated_years_experience || 'unknown'} years (required: ${filterRules.min_years_experience})`);
               }
               if (!aiAnalysis.passes_role_duration_check) {
-                filterReasons.push(`AI: Insufficient role duration (estimated ${aiAnalysis.estimated_months_in_role} months)`);
+                filterReasons.push(`Insufficient role duration: AI estimated ${aiAnalysis.estimated_months_in_role || 'unknown'} months (required: ${filterRules.min_months_current_role})`);
               }
               if (!aiAnalysis.passes_must_have_check) {
-                filterReasons.push(`AI: Low must-have terms match (score: ${aiAnalysis.must_have_score}%)`);
+                filterReasons.push(`Low must-have terms match: AI score ${aiAnalysis.must_have_score || 0}% (required: 70%)`);
               }
               if (!aiAnalysis.passes_exclude_check) {
-                filterReasons.push(`AI: High exclude terms match (score: ${aiAnalysis.exclude_terms_score}%)`);
+                filterReasons.push(`High exclude terms match: AI score ${aiAnalysis.exclude_terms_score || 0}% (max: 30%)`);
               }
               if (!aiAnalysis.passes_title_check) {
-                filterReasons.push(`AI: Poor title match (score: ${aiAnalysis.title_match_score}%)`);
+                filterReasons.push(`Poor title match: AI score ${aiAnalysis.title_match_score || 0}% (required: 60%)`);
               }
             }
 
           } catch (aiCallError) {
             console.error('Failed to call AI analysis:', aiCallError);
-            // Continue with basic filtering as fallback
+            // Continue with enhanced basic filtering as fallback
             stage2Pass = true;
             
-            if (candidate.years_of_experience < filterRules.min_years_experience) {
+            const experienceFromProfile = candidate.years_of_experience || 0;
+            if (experienceFromProfile < filterRules.min_years_experience) {
               stage2Pass = false;
-              filterReasons.push(`Less than ${filterRules.min_years_experience} years experience`);
+              filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
             }
           }
 
-          // Check top university requirement (keep this separate as it's not AI-enhanced yet)
+          // Check top university requirement (enhanced matching)
           if (stage2Pass && filterRules.require_top_uni) {
             const { data: topUniversities } = await supabase
               .from('top_universities')
@@ -341,7 +395,9 @@ const ProcessFilter = () => {
             const topUniList = topUniversities?.map(u => u.university_name.toLowerCase()) || [];
             const candidateEducation = candidate.education?.toLowerCase() || '';
             
-            const hasTopUni = topUniList.some(uni => candidateEducation.includes(uni));
+            const hasTopUni = topUniList.some(uni => 
+              candidateEducation.includes(uni) || uni.includes(candidateEducation.split(' ').slice(0, 3).join(' '))
+            );
             if (!hasTopUni) {
               stage2Pass = false;
               filterReasons.push('Not from top university');

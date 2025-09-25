@@ -48,17 +48,28 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { candidate, filterRules, userId } = await req.json();
+    const { candidate, filterRules, userId, synonyms = [] } = await req.json();
     console.log('Analyzing candidate:', candidate.current_title);
 
     // Create comprehensive text for analysis
     const candidateText = `
       Current Title: ${candidate.current_title || ''}
+      Current Company: ${candidate.current_company || ''}
+      Previous Company: ${candidate.previous_company || ''}
       Profile Summary: ${candidate.profile_summary || ''}
       Education: ${candidate.education || ''}
       Years of Experience: ${candidate.years_of_experience || 0}
       Months in Current Role: ${candidate.months_in_current_role || 0}
-    `.trim();
+      Full Name: ${candidate.full_name || ''}
+    `;
+
+    // Create synonyms context for AI
+    const synonymsContext = synonyms.length > 0 ? `
+    Available Synonyms for semantic matching:
+    ${synonyms.map((s: any) => `- ${s.canonical_term} ↔ ${s.variant_term} (${s.category})`).join('\n')}
+    
+    IMPORTANT: Use these synonyms when analyzing terms and titles. Consider semantic equivalents.
+    ` : '';
 
     // Get embeddings for candidate profile
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
