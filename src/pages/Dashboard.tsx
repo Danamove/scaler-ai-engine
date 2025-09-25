@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw, Briefcase } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useJobManager } from '@/hooks/useJobManager';
+import { JobCard } from '@/components/JobCard';
 
 interface DashboardStats {
   totalCandidates: number;
@@ -29,13 +32,20 @@ const Dashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobs, loading: jobsLoading, deleteJob } = useJobManager();
 
-  const handleRestart = async () => {
+  const handleJobDelete = async (jobId: string) => {
+    await deleteJob(jobId);
+    // Refresh stats after deletion
+    fetchDashboardStats();
+  };
+
+  const handleRestartAll = async () => {
     const activeUserId = getActiveUserId();
     if (!activeUserId) return;
     
     const activeUserEmail = getActiveUserEmail();
-    const confirmRestart = window.confirm(`Are you sure you want to restart data for ${activeUserEmail}? This action will delete all existing data (CSV files, filtering results, filter settings).`);
+    const confirmRestart = window.confirm(`האם אתה בטוח שברצונך למחוק את כל הנתונים עבור ${activeUserEmail}? פעולה זו תמחק את כל הקבצים, תוצאות הסינון והגדרות הסינון.`);
     
     if (!confirmRestart) return;
     
@@ -49,12 +59,13 @@ const Dashboard = () => {
         supabase.from('filter_rules').delete().eq('user_id', activeUserId),
         supabase.from('user_blacklist').delete().eq('user_id', activeUserId),
         supabase.from('user_past_candidates').delete().eq('user_id', activeUserId),
-        supabase.from('netly_files').delete().eq('user_id', activeUserId)
+        supabase.from('netly_files').delete().eq('user_id', activeUserId),
+        supabase.from('jobs').delete().eq('user_id', activeUserId)
       ]);
       
       toast({
-        title: "Restart completed successfully",
-        description: `All data has been deleted for ${activeUserEmail}. You can start fresh.`,
+        title: "איפוס הושלם בהצלחה",
+        description: `כל הנתונים נמחקו עבור ${activeUserEmail}. ניתן להתחיל מחדש.`,
       });
       
       // Navigate to upload page to start fresh
@@ -63,8 +74,8 @@ const Dashboard = () => {
     } catch (error: any) {
       console.error('Restart error:', error);
       toast({
-        title: "Restart Error",
-        description: error.message || "Failed to delete data.",
+        title: "שגיאת איפוס",
+        description: error.message || "נכשל במחיקת נתונים.",
         variant: "destructive",
       });
     } finally {
@@ -196,6 +207,66 @@ const Dashboard = () => {
             </p>
           </div>
 
+          {/* Jobs Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">המשרות שלי</h2>
+                <p className="text-muted-foreground">
+                  נהל את המשרות שלך (מקסימום 10 משרות)
+                </p>
+              </div>
+              <Badge variant="outline">
+                {jobs.length}/10 משרות
+              </Badge>
+            </div>
+
+            {jobsLoading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 3 }, (_, i) => (
+                  <Card key={i} className="card-shadow">
+                    <CardHeader>
+                      <div className="h-6 bg-muted animate-pulse rounded" />
+                      <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-muted animate-pulse rounded" />
+                        <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : jobs.length === 0 ? (
+              <Card className="card-shadow">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">אין משרות עדיין</h3>
+                  <p className="text-muted-foreground mb-4">
+                    התחל על ידי העלאת קובץ CSV עם פרטי מועמדים
+                  </p>
+                  <Link to="/upload">
+                    <Button>
+                      <Upload className="h-4 w-4" />
+                      העלה קובץ
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {jobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    onDelete={handleJobDelete}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Quick Actions */}
           <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
             <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
@@ -285,25 +356,47 @@ const Dashboard = () => {
                 <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
                   <RotateCcw className="h-6 w-6 text-destructive" />
                 </div>
-                <CardTitle className="text-lg text-destructive">Restart Project</CardTitle>
+                <CardTitle className="text-lg text-destructive">איפוס כללי</CardTitle>
                 <CardDescription>
-                  Clear all data and start fresh
+                  מחק את כל הנתונים והתחל מחדש
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
-                  variant="destructive" 
-                  className="w-full"
-                  onClick={handleRestart}
-                  disabled={isRestarting}
-                >
-                  {isRestarting ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <RotateCcw className="h-4 w-4" />
-                  )}
-                  {isRestarting ? 'Restarting...' : 'Restart'}
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      className="w-full"
+                      disabled={isRestarting}
+                    >
+                      {isRestarting ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <RotateCcw className="h-4 w-4" />
+                      )}
+                      {isRestarting ? 'מאפס...' : 'איפוס כללי'}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>איפוס כללי</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        האם אתה בטוח שברצונך למחוק את כל הנתונים? 
+                        פעולה זו תמחק את כל המשרות, המועמדים, תוצאות הסינון והגדרות הסינון.
+                        לא ניתן לבטל פעולה זו.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>ביטול</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleRestartAll}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        איפוס כללי
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           </div>
@@ -312,57 +405,50 @@ const Dashboard = () => {
           <div className="grid lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 card-shadow">
               <CardHeader>
-                <CardTitle>Recent Filtering Jobs</CardTitle>
+                <CardTitle>פעילות אחרונה</CardTitle>
                 <CardDescription>
-                  Your latest candidate filtering operations
+                  פעולות סינון האחרונות שלך
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-primary" />
+                  {jobs.slice(0, 3).map((job) => (
+                    <div key={job.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{job.job_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            עודכן {new Date(job.updated_at).toLocaleDateString('he-IL')}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">Senior Developers - Q1 2024</p>
-                        <p className="text-sm text-muted-foreground">Uploaded 2 hours ago</p>
-                      </div>
+                      <Badge variant="outline">פעיל</Badge>
                     </div>
-                    <Badge variant="secondary">Processing</Badge>
-                  </div>
+                  ))}
                   
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 bg-secondary/20 rounded-full flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-secondary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Product Managers - Tech</p>
-                        <p className="text-sm text-muted-foreground">Completed yesterday</p>
-                      </div>
+                  {jobs.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-4">אין פעילות אחרונה</p>
+                      <Link to="/upload">
+                        <Button variant="outline">
+                          <Upload className="h-4 w-4" />
+                          העלה נתונים חדשים
+                        </Button>
+                      </Link>
                     </div>
-                    <Badge variant="outline">Completed</Badge>
-                  </div>
-
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">No more recent activities</p>
-                    <Link to="/upload">
-                      <Button variant="outline">
-                        <Upload className="h-4 w-4" />
-                        Upload New Data
-                      </Button>
-                    </Link>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card className="card-shadow">
               <CardHeader>
-                <CardTitle>Quick Stats</CardTitle>
+                <CardTitle>סטטיסטיקות כלליות</CardTitle>
                 <CardDescription>
-                  Overview of your filtering performance
+                  סקירה כללית של ביצועי הסינון שלך
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -371,21 +457,21 @@ const Dashboard = () => {
                     <div className="text-3xl font-bold text-primary">
                       {statsLoading ? '...' : stats.totalCandidates.toLocaleString()}
                     </div>
-                    <p className="text-sm text-muted-foreground">Total Candidates Processed</p>
+                    <p className="text-sm text-muted-foreground">סך המועמדים שעובדו</p>
                   </div>
                   
                   <div className="text-center space-y-2">
                     <div className="text-3xl font-bold text-secondary">
                       {statsLoading ? '...' : `${stats.filterAccuracy}%`}
                     </div>
-                    <p className="text-sm text-muted-foreground">Filter Accuracy</p>
+                    <p className="text-sm text-muted-foreground">דיוק סינון</p>
                   </div>
                   
                   <div className="text-center space-y-2">
                     <div className="text-3xl font-bold text-accent">
                       {statsLoading ? '...' : stats.activeJobs}
                     </div>
-                    <p className="text-sm text-muted-foreground">Active Jobs</p>
+                    <p className="text-sm text-muted-foreground">משרות פעילות</p>
                   </div>
                 </div>
               </CardContent>
