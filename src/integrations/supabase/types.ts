@@ -14,7 +14,326 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      filter_rules: {
+        Row: {
+          created_at: string
+          exclude_terms: string[] | null
+          id: string
+          job_id: string
+          min_months_current_role: number | null
+          min_years_experience: number | null
+          must_have_terms: string[] | null
+          require_top_uni: boolean | null
+          required_titles: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          exclude_terms?: string[] | null
+          id?: string
+          job_id: string
+          min_months_current_role?: number | null
+          min_years_experience?: number | null
+          must_have_terms?: string[] | null
+          require_top_uni?: boolean | null
+          required_titles?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          exclude_terms?: string[] | null
+          id?: string
+          job_id?: string
+          min_months_current_role?: number | null
+          min_years_experience?: number | null
+          must_have_terms?: string[] | null
+          require_top_uni?: boolean | null
+          required_titles?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      filtered_results: {
+        Row: {
+          created_at: string
+          filter_reasons: string[] | null
+          id: string
+          job_id: string
+          raw_data_id: string
+          stage_1_passed: boolean
+          stage_2_passed: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filter_reasons?: string[] | null
+          id?: string
+          job_id: string
+          raw_data_id: string
+          stage_1_passed?: boolean
+          stage_2_passed?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filter_reasons?: string[] | null
+          id?: string
+          job_id?: string
+          raw_data_id?: string
+          stage_1_passed?: boolean
+          stage_2_passed?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filtered_results_raw_data_id_fkey"
+            columns: ["raw_data_id"]
+            isOneToOne: false
+            referencedRelation: "raw_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      netly_files: {
+        Row: {
+          additional_data: Json | null
+          candidate_name: string
+          created_at: string
+          id: string
+          job_id: string
+          user_id: string
+        }
+        Insert: {
+          additional_data?: Json | null
+          candidate_name: string
+          created_at?: string
+          id?: string
+          job_id: string
+          user_id: string
+        }
+        Update: {
+          additional_data?: Json | null
+          candidate_name?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      not_relevant_companies: {
+        Row: {
+          category: string | null
+          company_name: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          category?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          category?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      raw_data: {
+        Row: {
+          created_at: string
+          current_company: string | null
+          current_title: string | null
+          education: string | null
+          full_name: string
+          id: string
+          linkedin_url: string | null
+          months_in_current_role: number | null
+          previous_company: string | null
+          profile_summary: string | null
+          user_id: string
+          years_of_experience: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_company?: string | null
+          current_title?: string | null
+          education?: string | null
+          full_name: string
+          id?: string
+          linkedin_url?: string | null
+          months_in_current_role?: number | null
+          previous_company?: string | null
+          profile_summary?: string | null
+          user_id: string
+          years_of_experience?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_company?: string | null
+          current_title?: string | null
+          education?: string | null
+          full_name?: string
+          id?: string
+          linkedin_url?: string | null
+          months_in_current_role?: number | null
+          previous_company?: string | null
+          profile_summary?: string | null
+          user_id?: string
+          years_of_experience?: number | null
+        }
+        Relationships: []
+      }
+      synonyms: {
+        Row: {
+          canonical_term: string
+          category: string
+          created_at: string
+          id: string
+          variant_term: string
+        }
+        Insert: {
+          canonical_term: string
+          category: string
+          created_at?: string
+          id?: string
+          variant_term: string
+        }
+        Update: {
+          canonical_term?: string
+          category?: string
+          created_at?: string
+          id?: string
+          variant_term?: string
+        }
+        Relationships: []
+      }
+      target_companies: {
+        Row: {
+          category: string | null
+          company_name: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          category?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          category?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      top_universities: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          university_name: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          university_name: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          university_name?: string
+        }
+        Relationships: []
+      }
+      user_blacklist: {
+        Row: {
+          company_name: string
+          created_at: string
+          id: string
+          job_id: string | null
+          user_id: string
+        }
+        Insert: {
+          company_name: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          user_id: string
+        }
+        Update: {
+          company_name?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_past_candidates: {
+        Row: {
+          candidate_name: string
+          created_at: string
+          id: string
+          job_id: string | null
+          user_id: string
+        }
+        Insert: {
+          candidate_name: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          user_id: string
+        }
+        Update: {
+          candidate_name?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +342,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +469,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["admin", "user"],
+    },
   },
 } as const
