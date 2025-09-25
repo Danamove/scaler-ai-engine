@@ -26,6 +26,8 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   
   const { signIn, signUp, user } = useAuth();
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   const navigate = useNavigate();
 
   // Redirect if already authenticated
@@ -90,6 +92,32 @@ const Auth = () => {
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!formData.email) {
+      setErrors({ email: 'Please enter your email address' });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) {
+        setErrors({ general: error.message });
+      } else {
+        setResetSuccess(true);
+        setErrors({});
+      }
+    } catch (error) {
+      setErrors({ general: 'Failed to send reset email' });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -189,14 +217,37 @@ const Auth = () => {
                   )}
                 </div>
 
+                {errors.general && (
+                  <p className="text-sm text-destructive text-center">{errors.general}</p>
+                )}
+
+                {resetSuccess && (
+                  <p className="text-sm text-green-600 text-center">
+                    Password reset email sent! Check your inbox.
+                  </p>
+                )}
+
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={loading}
+                  disabled={loading || isResetting}
                   variant="hero"
                 >
                   {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
                 </Button>
+
+                {!isSignUp && (
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm"
+                    className="w-full text-sm"
+                    onClick={handlePasswordReset}
+                    disabled={isResetting || loading}
+                  >
+                    {isResetting ? 'Sending...' : 'Forgot Password?'}
+                  </Button>
+                )}
               </form>
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
