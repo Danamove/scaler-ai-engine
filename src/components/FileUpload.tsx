@@ -73,19 +73,44 @@ export const FileUpload = ({
     if (!user) return;
 
     try {
-      // Transform data to match our raw_data table structure
-      const rawDataRecords = data.map(row => ({
-        user_id: user.id,
-        full_name: row['Full Name'] || row['Name'] || '',
-        current_title: row['Current Title'] || row['Title'] || '',
-        current_company: row['Current Company'] || row['Company'] || '',
-        previous_company: row['Previous Company'] || '',
-        linkedin_url: row['LinkedIn URL'] || row['LinkedIn'] || '',
-        profile_summary: row['Profile Summary'] || row['Summary'] || '',
-        education: row['Education'] || '',
-        years_of_experience: parseInt(row['Years of Experience'] || '0') || 0,
-        months_in_current_role: parseInt(row['Months in Current Role'] || '0') || 0,
-      }));
+      // Transform LinkedIn scraped data to match our raw_data table structure
+      const rawDataRecords = data.map(row => {
+        // Calculate years of experience from date ranges if available
+        const getYearsFromDateRange = (dateRange: string): number => {
+          if (!dateRange || dateRange.includes('Present')) return 0;
+          const matches = dateRange.match(/(\d{4})/g);
+          if (matches && matches.length >= 2) {
+            return parseInt(matches[matches.length - 1]) - parseInt(matches[0]);
+          }
+          return 0;
+        };
+
+        const getCurrentRoleMonths = (dateRange: string): number => {
+          if (!dateRange || !dateRange.includes('Present')) return 0;
+          const match = dateRange.match(/(\w+)\s+(\d{4})\s*-\s*Present/);
+          if (match) {
+            const startYear = parseInt(match[2]);
+            const currentYear = new Date().getFullYear();
+            const startMonth = new Date(`${match[1]} 1, ${startYear}`).getMonth();
+            const currentMonth = new Date().getMonth();
+            return (currentYear - startYear) * 12 + (currentMonth - startMonth);
+          }
+          return 0;
+        };
+
+        return {
+          user_id: user.id,
+          full_name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+          current_title: row.linkedinJobTitle || row.linkedinHeadline || '',
+          current_company: row.companyName || '',
+          previous_company: row.previousCompanyName || '',
+          linkedin_url: row.linkedinProfileUrl || '',
+          profile_summary: row.linkedinDescription || row.profilesummery || '',
+          education: row.linkedinSchoolName || '',
+          years_of_experience: getYearsFromDateRange(row.linkedinJobDateRange || ''),
+          months_in_current_role: getCurrentRoleMonths(row.linkedinJobDateRange || ''),
+        };
+      });
 
       const { error } = await supabase
         .from('raw_data')
@@ -222,10 +247,11 @@ export const FileUpload = ({
               </div>
             </div>
             
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Data Preview:</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground mb-2">Data Preview (First Row Columns):</p>
               <div className="bg-muted/30 p-3 rounded border text-xs font-mono max-h-32 overflow-y-auto">
-                {Object.keys(parsedData[0] || {}).join(', ')}
+                {Object.keys(parsedData[0] || {}).slice(0, 10).join(', ')}
+                {Object.keys(parsedData[0] || {}).length > 10 && '...'}
               </div>
             </div>
 

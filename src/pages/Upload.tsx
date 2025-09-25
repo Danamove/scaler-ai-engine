@@ -75,31 +75,26 @@ const Upload = () => {
 
           {/* Upload Component */}
           <FileUpload
-            title="Candidate Data CSV"
-            description="Upload a CSV file containing candidate profiles with columns like: Full Name, Current Title, Current Company, LinkedIn URL, etc."
+            title="Raw Data CSV"
+            description="Upload your LinkedIn scraped candidate data CSV file to start the filtering process"
             onUploadComplete={handleUploadComplete}
           />
 
-          {/* Expected Format Info */}
+          {/* Info Card - Simplified */}
           <div className="bg-muted/30 rounded-lg p-6 space-y-4">
             <div className="flex items-start space-x-3">
               <FileText className="h-5 w-5 text-primary mt-0.5" />
               <div className="space-y-2">
-                <h3 className="font-semibold">Expected CSV Format</h3>
+                <h3 className="font-semibold">File Requirements</h3>
                 <p className="text-sm text-muted-foreground">
-                  Your CSV file should include the following columns (case-sensitive):
+                  Upload your Raw Data CSV file containing LinkedIn scraped candidate information.
+                  The system will automatically process and map the data fields.
                 </p>
-                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside ml-4">
-                  <li><strong>Full Name</strong> - Candidate's full name</li>
-                  <li><strong>Current Title</strong> - Current job title</li>
-                  <li><strong>Current Company</strong> - Current workplace</li>
-                  <li><strong>Previous Company</strong> - Previous workplace (optional)</li>
-                  <li><strong>LinkedIn URL</strong> - LinkedIn profile link</li>
-                  <li><strong>Profile Summary</strong> - Brief candidate summary</li>
-                  <li><strong>Education</strong> - Educational background</li>
-                  <li><strong>Years of Experience</strong> - Total years (number)</li>
-                  <li><strong>Months in Current Role</strong> - Duration (number)</li>
-                </ul>
+                <div className="text-xs text-muted-foreground">
+                  <p>• CSV format only</p>
+                  <p>• Maximum file size: 50MB</p>
+                  <p>• LinkedIn scraped data structure expected</p>
+                </div>
               </div>
             </div>
           </div>
