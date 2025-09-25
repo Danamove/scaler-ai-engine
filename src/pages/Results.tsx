@@ -99,8 +99,9 @@ const Results = () => {
       // Calculate stats
       const totalCandidates = transformedResults.length;
       const stage1Passed = transformedResults.filter(r => r.stage_1_passed).length;
-      const stage2Passed = transformedResults.filter(r => r.stage_2_passed).length;
       const finalResults = transformedResults.filter(r => r.stage_1_passed && r.stage_2_passed).length;
+      // Stage 2 passed should be the same as final results since you can only pass stage 2 if you passed stage 1
+      const stage2Passed = finalResults;
 
       setStats({
         total_candidates: totalCandidates,
