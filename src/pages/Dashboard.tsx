@@ -4,12 +4,57 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText } from 'lucide-react';
+import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
 
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isRestarting, setIsRestarting] = useState(false);
+
+  const handleRestart = async () => {
+    if (!user) return;
+    
+    const confirmRestart = window.confirm('האם אתה בטוח שברצונך להתחיל מחדש? פעולה זו תמחק את כל הנתונים הקיימים (קבצי CSV, תוצאות סינון, הגדרות סינון).');
+    
+    if (!confirmRestart) return;
+    
+    setIsRestarting(true);
+    
+    try {
+      // Delete all user data in parallel
+      await Promise.all([
+        supabase.from('raw_data').delete().eq('user_id', user.id),
+        supabase.from('filtered_results').delete().eq('user_id', user.id),
+        supabase.from('filter_rules').delete().eq('user_id', user.id),
+        supabase.from('user_blacklist').delete().eq('user_id', user.id),
+        supabase.from('user_past_candidates').delete().eq('user_id', user.id),
+        supabase.from('netly_files').delete().eq('user_id', user.id)
+      ]);
+      
+      toast({
+        title: "Restart הושלם בהצלחה",
+        description: "כל הנתונים נמחקו. תוכל להתחיל מחדש.",
+      });
+      
+      // Navigate to upload page to start fresh
+      navigate('/upload');
+      
+    } catch (error: any) {
+      console.error('Restart error:', error);
+      toast({
+        title: "שגיאה ב-Restart",
+        description: error.message || "לא ניתן למחוק את הנתונים.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRestarting(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -67,7 +112,7 @@ const Dashboard = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
             <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
               <CardHeader className="pb-4">
                 <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
@@ -142,6 +187,33 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full">
                   <Users className="h-4 w-4" />
                   Admin Tools
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer border-destructive/20">
+              <CardHeader className="pb-4">
+                <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center mb-2">
+                  <RotateCcw className="h-6 w-6 text-destructive" />
+                </div>
+                <CardTitle className="text-lg text-destructive">Restart Project</CardTitle>
+                <CardDescription>
+                  Clear all data and start fresh
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  variant="destructive" 
+                  className="w-full"
+                  onClick={handleRestart}
+                  disabled={isRestarting}
+                >
+                  {isRestarting ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4" />
+                  )}
+                  {isRestarting ? 'Restarting...' : 'Restart'}
                 </Button>
               </CardContent>
             </Card>
