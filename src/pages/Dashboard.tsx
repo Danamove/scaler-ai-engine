@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,10 +79,12 @@ const Dashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="default" className="w-full">
-                  <Upload className="h-4 w-4" />
-                  Upload Files
-                </Button>
+                <Link to="/upload">
+                  <Button variant="default" className="w-full">
+                    <Upload className="h-4 w-4" />
+                    Upload Files
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -179,10 +182,12 @@ const Dashboard = () => {
 
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No more recent activities</p>
-                    <Button variant="outline">
-                      <Upload className="h-4 w-4" />
-                      Upload New Data
-                    </Button>
+                    <Link to="/upload">
+                      <Button variant="outline">
+                        <Upload className="h-4 w-4" />
+                        Upload New Data
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </CardContent>
