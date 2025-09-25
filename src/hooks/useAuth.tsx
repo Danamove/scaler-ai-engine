@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 .from('profiles')
                 .select('*')
                 .eq('user_id', session.user.id)
-                .single();
+                .maybeSingle();
 
               // Create profile if it doesn't exist
               if (!existingProfile) {

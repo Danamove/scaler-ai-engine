@@ -63,7 +63,7 @@ export const useJobManager = () => {
         .select('id')
         .eq('user_id', activeUserId)
         .eq('job_id', jobId)
-        .single();
+        .maybeSingle();
 
       if (existingJob) {
         // Job already exists, just update the name and timestamp
