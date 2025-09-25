@@ -19,7 +19,11 @@ const FilterConfig = () => {
   const { toast } = useToast();
   
   const [config, setConfig] = useState({
-    jobId: '',
+    jobTitle: '',
+    // Stage 1 Filters
+    useNotRelevantFilter: false,
+    useTargetCompaniesFilter: false,
+    // Stage 2 Filters
     minYearsExperience: 0,
     minMonthsCurrentRole: 0,
     excludeTerms: '',
@@ -54,10 +58,10 @@ const FilterConfig = () => {
   }
 
   const handleSaveConfig = async () => {
-    if (!config.jobId.trim()) {
+    if (!config.jobTitle.trim()) {
       toast({
-        title: "Job ID Required",
-        description: "Please enter a Job ID to save the configuration.",
+        title: "Job Title Required",
+        description: "Please enter a Job Title to save the configuration.",
         variant: "destructive",
       });
       return;
@@ -71,7 +75,11 @@ const FilterConfig = () => {
         .from('filter_rules')
         .upsert({
           user_id: user.id,
-          job_id: config.jobId,
+          job_id: config.jobTitle,
+          // Stage 1 settings
+          use_not_relevant_filter: config.useNotRelevantFilter,
+          use_target_companies_filter: config.useTargetCompaniesFilter,
+          // Stage 2 settings
           min_years_experience: config.minYearsExperience,
           min_months_current_role: config.minMonthsCurrentRole,
           exclude_terms: config.excludeTerms.split(',').map(t => t.trim()).filter(Boolean),
@@ -87,7 +95,7 @@ const FilterConfig = () => {
         const companies = blacklistCompanies.split('\n').map(c => c.trim()).filter(Boolean);
         const blacklistData = companies.map(company => ({
           user_id: user.id,
-          job_id: config.jobId,
+          job_id: config.jobTitle,
           company_name: company,
         }));
 
@@ -103,7 +111,7 @@ const FilterConfig = () => {
         const candidates = pastCandidates.split('\n').map(c => c.trim()).filter(Boolean);
         const candidatesData = candidates.map(candidate => ({
           user_id: user.id,
-          job_id: config.jobId,
+          job_id: config.jobTitle,
           candidate_name: candidate,
         }));
 
@@ -116,7 +124,7 @@ const FilterConfig = () => {
 
       toast({
         title: "Configuration Saved!",
-        description: `Filter rules for job "${config.jobId}" have been saved successfully.`,
+        description: `Filter rules for "${config.jobTitle}" have been saved successfully.`,
       });
 
       // Navigate back to dashboard after successful save
@@ -171,163 +179,187 @@ const FilterConfig = () => {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            {/* Main Filter Rules */}
-            <div className="space-y-6">
-              <Card className="card-shadow">
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Filter className="h-5 w-5 text-primary" />
-                    <CardTitle>Basic Filter Rules</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Configure core filtering parameters for Stage 2 filtering
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="jobId">Job ID *</Label>
-                    <Input
-                      id="jobId"
-                      placeholder="e.g. TECH-PM-2024-Q1"
-                      value={config.jobId}
-                      onChange={(e) => setConfig({...config, jobId: e.target.value})}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Unique identifier for this filtering job
-                    </p>
-                  </div>
+          <div className="grid lg:grid-cols-1 gap-8">
+            {/* Stage 1: Company & Lists Filtering */}
+            <Card className="card-shadow">
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <Building className="h-5 w-5 text-primary" />
+                  <CardTitle>Stage 1: Company & Lists Filtering</CardTitle>
+                </div>
+                <CardDescription>
+                  Basic filtering based on companies and candidate lists (applied first)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="jobTitle">Job Title *</Label>
+                  <Input
+                    id="jobTitle"
+                    placeholder="e.g. Senior Product Manager"
+                    value={config.jobTitle}
+                    onChange={(e) => setConfig({...config, jobTitle: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Job title for this filtering configuration
+                  </p>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minYears">Min Years Experience</Label>
-                      <Input
-                        id="minYears"
-                        type="number"
-                        min="0"
-                        value={config.minYearsExperience}
-                        onChange={(e) => setConfig({...config, minYearsExperience: parseInt(e.target.value) || 0})}
+                <Separator />
+
+                {/* Built-in Lists Options */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="notRelevant"
+                        checked={config.useNotRelevantFilter}
+                        onCheckedChange={(checked) => setConfig({...config, useNotRelevantFilter: checked})}
                       />
+                      <Label htmlFor="notRelevant" className="font-medium">Filter NotRelevant Companies</Label>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="minMonths">Min Months in Current Role</Label>
-                      <Input
-                        id="minMonths"
-                        type="number"
-                        min="0"
-                        value={config.minMonthsCurrentRole}
-                        onChange={(e) => setConfig({...config, minMonthsCurrentRole: parseInt(e.target.value) || 0})}
+                    <p className="text-sm text-muted-foreground">
+                      Remove candidates from built-in NotRelevant companies list (current + previous company)
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="targetCompanies"
+                        checked={config.useTargetCompaniesFilter}
+                        onCheckedChange={(checked) => setConfig({...config, useTargetCompaniesFilter: checked})}
                       />
+                      <Label htmlFor="targetCompanies" className="font-medium">Filter Target Companies Only</Label>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="excludeTerms">Exclude Terms</Label>
-                    <Textarea
-                      id="excludeTerms"
-                      placeholder="intern, junior, assistant (comma-separated)"
-                      value={config.excludeTerms}
-                      onChange={(e) => setConfig({...config, excludeTerms: e.target.value})}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Candidates with these terms in titles will be filtered out
+                    <p className="text-sm text-muted-foreground">
+                      Keep only candidates from built-in Target companies list (current + previous company)
                     </p>
                   </div>
+                </div>
 
+                <Separator />
+
+                {/* User Lists */}
+                <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="mustHave">Must Have Terms</Label>
-                    <Textarea
-                      id="mustHave"
-                      placeholder="senior, manager, lead (comma-separated)"
-                      value={config.mustHaveTerms}
-                      onChange={(e) => setConfig({...config, mustHaveTerms: e.target.value})}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Candidates must have at least one of these terms
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="titles">Required Titles</Label>
-                    <Textarea
-                      id="titles"
-                      placeholder="Product Manager, Technical Lead (comma-separated)"
-                      value={config.requiredTitles}
-                      onChange={(e) => setConfig({...config, requiredTitles: e.target.value})}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Specific job titles to filter for (with synonyms)
-                    </p>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="topUni"
-                      checked={config.requireTopUni}
-                      onCheckedChange={(checked) => setConfig({...config, requireTopUni: checked})}
-                    />
-                    <Label htmlFor="topUni">Require Top University</Label>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* User Lists */}
-            <div className="space-y-6">
-              <Card className="card-shadow">
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Building className="h-5 w-5 text-accent" />
-                    <CardTitle>Blacklist Companies</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Companies to exclude (Stage 1 filtering)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Label htmlFor="blacklist">Company Names</Label>
+                    <Label htmlFor="blacklist">Blacklist Companies</Label>
                     <Textarea
                       id="blacklist"
                       placeholder="Company Name 1&#10;Company Name 2&#10;Company Name 3"
-                      rows={8}
+                      rows={6}
                       value={blacklistCompanies}
                       onChange={(e) => setBlacklistCompanies(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      One company name per line. Checked against current company only.
+                      One company per line. Checked against <strong>current company only</strong>.
                     </p>
                   </div>
-                </CardContent>
-              </Card>
 
-              <Card className="card-shadow">
-                <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-5 w-5 text-secondary" />
-                    <CardTitle>Past Candidates</CardTitle>
-                  </div>
-                  <CardDescription>
-                    Candidates to exclude from this job
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
                   <div className="space-y-2">
-                    <Label htmlFor="pastCandidates">Candidate Names</Label>
+                    <Label htmlFor="pastCandidates">Past Candidates</Label>
                     <Textarea
                       id="pastCandidates"
                       placeholder="John Doe&#10;Jane Smith&#10;Mike Johnson"
-                      rows={8}
+                      rows={6}
                       value={pastCandidates}
                       onChange={(e) => setPastCandidates(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      One candidate name per line. These will be filtered out.
+                      One candidate name per line. These will be filtered out completely.
                     </p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stage 2: User Rules */}
+            <Card className="card-shadow">
+              <CardHeader>
+                <div className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5 text-secondary" />
+                  <CardTitle>Stage 2: User Rules Filtering</CardTitle>
+                </div>
+                <CardDescription>
+                  Advanced filtering based on experience, skills, and requirements (applied after Stage 1)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="minYears">Minimum Years Experience</Label>
+                    <Input
+                      id="minYears"
+                      type="number"
+                      min="0"
+                      value={config.minYearsExperience}
+                      onChange={(e) => setConfig({...config, minYearsExperience: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="minMonths">Minimum Months in Current Role</Label>
+                    <Input
+                      id="minMonths"
+                      type="number"
+                      min="0"
+                      value={config.minMonthsCurrentRole}
+                      onChange={(e) => setConfig({...config, minMonthsCurrentRole: parseInt(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="excludeTerms">Exclude List</Label>
+                  <Textarea
+                    id="excludeTerms"
+                    placeholder="intern, junior, assistant (comma-separated)"
+                    value={config.excludeTerms}
+                    onChange={(e) => setConfig({...config, excludeTerms: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Filter out candidates with these terms in current title (includes synonyms)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mustHave">Must Have List</Label>
+                  <Textarea
+                    id="mustHave"
+                    placeholder="senior, manager, lead (comma-separated)"
+                    value={config.mustHaveTerms}
+                    onChange={(e) => setConfig({...config, mustHaveTerms: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Candidates must have at least one of these terms (includes synonyms)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="titles">Title Check</Label>
+                  <Textarea
+                    id="titles"
+                    placeholder="Product Manager, Technical Lead (comma-separated)"
+                    value={config.requiredTitles}
+                    onChange={(e) => setConfig({...config, requiredTitles: e.target.value})}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required job titles (includes synonyms)
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="topUni"
+                    checked={config.requireTopUni}
+                    onCheckedChange={(checked) => setConfig({...config, requireTopUni: checked})}
+                  />
+                  <Label htmlFor="topUni">Top University Check</Label>
+                  <p className="text-sm text-muted-foreground ml-auto">
+                    Validate education against built-in Top Universities list
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Save Button */}
