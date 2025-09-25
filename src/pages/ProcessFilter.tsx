@@ -82,11 +82,14 @@ const ProcessFilter = () => {
         throw candidatesError;
       }
 
-      const { data: filterRules, error: filterRulesError } = await supabase
+      const { data: filterRulesArray, error: filterRulesError } = await supabase
         .from('filter_rules')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const filterRules = filterRulesArray?.[0];
 
       if (filterRulesError) {
         console.error('Error loading filter rules:', filterRulesError);
