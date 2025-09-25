@@ -13,7 +13,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Filter className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Filterly</h1>
+            <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant="secondary" className="hidden sm:inline-flex">
@@ -233,7 +233,7 @@ const Index = () => {
               </span>
             </h2>
             <p className="text-xl text-muted-foreground">
-              Join leading companies using Filterly to streamline candidate filtering 
+              Join leading companies using Scaler to streamline candidate filtering 
               and improve hiring efficiency.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -257,10 +257,10 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Filter className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-foreground">Filterly</span>
+              <span className="font-semibold text-foreground">Scaler</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2025 Filterly by AddedValue
+              © 2025 Scaler by AddedValue
             </div>
           </div>
         </div>

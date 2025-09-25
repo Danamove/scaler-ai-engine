@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,13 +8,13 @@ import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
 
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isRestarting, setIsRestarting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const handleRestart = async () => {
     if (!user) return;
@@ -62,6 +62,18 @@ const Dashboard = () => {
     }
   }, [user, loading, navigate]);
 
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user?.email === 'dana@added-value.co.il') {
+        setIsAdmin(true);
+      }
+    };
+    
+    if (user) {
+      checkAdminStatus();
+    }
+  }, [user]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -84,7 +96,7 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Filter className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Filterly</h1>
+            <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant="secondary">
@@ -173,23 +185,27 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
-              <CardHeader className="pb-4">
-                <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Admin Panel</CardTitle>
-                <CardDescription>
-                  Manage built-in lists and system settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full">
-                  <Users className="h-4 w-4" />
-                  Admin Tools
-                </Button>
-              </CardContent>
-            </Card>
+            {isAdmin && (
+              <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
+                <CardHeader className="pb-4">
+                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-lg">Admin Panel</CardTitle>
+                  <CardDescription>
+                    View API costs and system analytics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link to="/admin-costs">
+                    <Button variant="outline" className="w-full">
+                      <Users className="h-4 w-4" />
+                      API Cost Tracking
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer border-destructive/20">
               <CardHeader className="pb-4">

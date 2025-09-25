@@ -100,7 +100,7 @@ const Auth = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-2">
             <Filter className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Filterly</h1>
+            <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </Link>
           <Link to="/">
             <Button variant="ghost" size="sm">
@@ -115,7 +115,7 @@ const Auth = () => {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold">Welcome to Filterly</h2>
+            <h2 className="text-3xl font-bold">Welcome to Scaler</h2>
             <p className="text-muted-foreground">
               Sign in to access your candidate filtering dashboard
             </p>

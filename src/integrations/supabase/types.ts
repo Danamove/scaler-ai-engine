@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_costs: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          function_name: string
+          id: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          function_name: string
+          id?: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          function_name?: string
+          id?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       filter_rules: {
         Row: {
           created_at: string

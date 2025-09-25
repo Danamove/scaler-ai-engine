@@ -48,7 +48,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { candidate, filterRules } = await req.json();
+    const { candidate, filterRules, userId } = await req.json();
     console.log('Analyzing candidate:', candidate.current_title);
 
     // Create comprehensive text for analysis
@@ -174,6 +174,29 @@ serve(async (req) => {
     };
 
     console.log('Analysis result:', result);
+
+    // Initialize Supabase client for cost tracking
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Track API costs
+    try {
+      const analysisText = analysisData.choices[0].message.content.trim();
+      const estimatedTokens = Math.ceil((candidateText.length + analysisText.length) / 4);
+      const estimatedCost = (estimatedTokens / 1000000) * 0.15; // GPT-4o-mini pricing
+      
+      await supabaseClient.from('api_costs').insert({
+        user_id: userId,
+        function_name: 'analyze-candidate-profile',
+        tokens_used: estimatedTokens,
+        cost_usd: estimatedCost
+      });
+    } catch (costError) {
+      console.error('Failed to track API cost:', costError);
+      // Don't fail the request if cost tracking fails
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
