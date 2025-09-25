@@ -329,6 +329,26 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
+            <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
+              <CardHeader className="pb-4">
+                <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-2">
+                  <Users className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Network Analysis</CardTitle>
+                <CardDescription>
+                  Compare results with your network connections
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to="/netly">
+                  <Button variant="outline" className="w-full">
+                    <Users className="h-4 w-4" />
+                    Netly Analysis
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
             {isAdmin && (
               <Card className="card-shadow transition-smooth hover:enterprise-shadow cursor-pointer">
                 <CardHeader className="pb-4">

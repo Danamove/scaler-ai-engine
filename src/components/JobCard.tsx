@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, BarChart3, Filter, Calendar } from 'lucide-react';
+import { Trash2, BarChart3, Filter, Calendar, Users } from 'lucide-react';
 import { Job, JobStats, useJobManager } from '@/hooks/useJobManager';
 import { Link } from 'react-router-dom';
 
@@ -112,10 +112,10 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
               Results
             </Button>
           </Link>
-          <Link to="/filter-config" className="flex-1">
+          <Link to="/netly" className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
-              <Filter className="h-4 w-4" />
-              Settings
+              <Users className="h-4 w-4" />
+              Network
             </Button>
           </Link>
         </div>

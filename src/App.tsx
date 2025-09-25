@@ -13,6 +13,7 @@ import Upload from "./pages/Upload";
 import FilterConfig from "./pages/FilterConfig";
 import ProcessFilter from "./pages/ProcessFilter";
 import Results from "./pages/Results";
+import Netly from "./pages/Netly";
 import AdminCosts from "./pages/AdminCosts";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/filter-config" element={<FilterConfig />} />
               <Route path="/process-filter" element={<ProcessFilter />} />
               <Route path="/results" element={<Results />} />
+              <Route path="/netly" element={<Netly />} />
             <Route path="/admin-costs" element={<AdminCosts />} />
             <Route path="/admin-panel" element={<AdminPanel />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
