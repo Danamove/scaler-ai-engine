@@ -443,6 +443,15 @@ const Results = () => {
                   <Button 
                     variant="outline" 
                     size="sm"
+                    onClick={() => handleExport('stage1')}
+                    disabled={exporting || stats.stage_1_passed === 0}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Stage 1
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
                     onClick={() => handleExport('final')}
                     disabled={exporting || stats.final_results === 0}
                   >
