@@ -239,7 +239,7 @@ const Index = () => {
               Ready to Transform Your
               <br />
               <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Recruitment Process?
+                Sourcing Process?
               </span>
             </h2>
             <p className="text-xl text-muted-foreground">
