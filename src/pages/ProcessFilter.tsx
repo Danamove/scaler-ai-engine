@@ -8,6 +8,7 @@ import { Filter, ArrowLeft, Play, CheckCircle, XCircle, Users, Building } from '
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
 interface ProcessStats {
   totalCandidates: number;
@@ -21,6 +22,7 @@ const ProcessFilter = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   
   const [processing, setProcessing] = useState(false);
   const [stats, setStats] = useState<ProcessStats>({

@@ -5,10 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Filter, ArrowLeft, Database, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { FileUpload } from '@/components/FileUpload';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
 const Upload = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,6 +48,11 @@ const Upload = () => {
             <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </div>
           <div className="flex items-center space-x-4">
+            {isImpersonating && impersonatedUser && (
+              <Badge variant="default" className="bg-primary">
+                Uploading for: {impersonatedUser.email}
+              </Badge>
+            )}
             <Badge variant="secondary">
               {user.email}
             </Badge>
@@ -67,17 +74,24 @@ const Upload = () => {
             <div className="h-16 w-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto">
               <Database className="h-8 w-8 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold">Upload Raw Data</h1>
+            <h1 className="text-3xl font-bold">
+              {isImpersonating ? `Upload Data for ${impersonatedUser?.email}` : 'Upload Raw Data'}
+            </h1>
             <p className="text-xl text-muted-foreground">
-              Upload your candidate CSV file to start the filtering process
+              {isImpersonating 
+                ? `Upload candidate CSV file for ${impersonatedUser?.email} to start the filtering process`
+                : 'Upload your candidate CSV file to start the filtering process'
+              }
             </p>
           </div>
 
           {/* Upload Component */}
           <FileUpload
-            title="Raw Data CSV"
-            description="Upload your LinkedIn scraped candidate data CSV file to start the filtering process"
+            title="Upload Candidate Data"
+            description="Upload your LinkedIn scraped candidate CSV file to start the filtering process"
+            acceptedTypes=".csv"
             onUploadComplete={handleUploadComplete}
+            userId={getActiveUserId()}
           />
 
           {/* Info Card - Simplified */}

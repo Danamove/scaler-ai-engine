@@ -12,11 +12,13 @@ import { Filter, ArrowLeft, Settings, Users, Building, GraduationCap, Save } fro
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
 const FilterConfig = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   
   const [config, setConfig] = useState({
     jobTitle: '',

@@ -13,13 +13,15 @@ interface FileUploadProps {
   description: string;
   acceptedTypes?: string;
   onUploadComplete?: (data: any[]) => void;
+  userId?: string; // Allow custom user ID for admin impersonation
 }
 
 export const FileUpload = ({ 
   title, 
   description, 
   acceptedTypes = ".csv",
-  onUploadComplete 
+  onUploadComplete,
+  userId // Custom user ID for admin impersonation
 }: FileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -78,7 +80,8 @@ export const FileUpload = ({
   };
 
   const saveToDatabase = async (data: any[]) => {
-    if (!user) return;
+    const activeUserId = userId || user?.id;
+    if (!activeUserId) return;
 
     try {
       console.log('Transforming data for database...');
@@ -115,7 +118,7 @@ export const FileUpload = ({
         };
 
         return {
-          user_id: user.id,
+          user_id: activeUserId,
           full_name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
           current_title: row.linkedinJobTitle || row.linkedinHeadline || '',
           current_company: row.companyName || '',

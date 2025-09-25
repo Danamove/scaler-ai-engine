@@ -8,6 +8,7 @@ import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
@@ -15,11 +16,14 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [isRestarting, setIsRestarting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
 
   const handleRestart = async () => {
-    if (!user) return;
+    const activeUserId = getActiveUserId();
+    if (!activeUserId) return;
     
-    const confirmRestart = window.confirm('Are you sure you want to restart? This action will delete all existing data (CSV files, filtering results, filter settings).');
+    const activeUserEmail = getActiveUserEmail();
+    const confirmRestart = window.confirm(`Are you sure you want to restart data for ${activeUserEmail}? This action will delete all existing data (CSV files, filtering results, filter settings).`);
     
     if (!confirmRestart) return;
     
@@ -28,17 +32,17 @@ const Dashboard = () => {
     try {
       // Delete all user data in parallel
       await Promise.all([
-        supabase.from('raw_data').delete().eq('user_id', user.id),
-        supabase.from('filtered_results').delete().eq('user_id', user.id),
-        supabase.from('filter_rules').delete().eq('user_id', user.id),
-        supabase.from('user_blacklist').delete().eq('user_id', user.id),
-        supabase.from('user_past_candidates').delete().eq('user_id', user.id),
-        supabase.from('netly_files').delete().eq('user_id', user.id)
+        supabase.from('raw_data').delete().eq('user_id', activeUserId),
+        supabase.from('filtered_results').delete().eq('user_id', activeUserId),
+        supabase.from('filter_rules').delete().eq('user_id', activeUserId),
+        supabase.from('user_blacklist').delete().eq('user_id', activeUserId),
+        supabase.from('user_past_candidates').delete().eq('user_id', activeUserId),
+        supabase.from('netly_files').delete().eq('user_id', activeUserId)
       ]);
       
       toast({
         title: "Restart completed successfully",
-        description: "All data has been deleted. You can start fresh.",
+        description: `All data has been deleted for ${activeUserEmail}. You can start fresh.`,
       });
       
       // Navigate to upload page to start fresh
@@ -99,6 +103,11 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </div>
           <div className="flex items-center space-x-4">
+            {isImpersonating && impersonatedUser && (
+              <Badge variant="default" className="bg-primary">
+                Viewing: {impersonatedUser.email}
+              </Badge>
+            )}
             <Badge variant="secondary">
               {user.email}
             </Badge>
@@ -116,10 +125,13 @@ const Dashboard = () => {
           {/* Welcome Section */}
           <div className="space-y-4">
             <h1 className="text-3xl font-bold">
-              Welcome back!
+              {isImpersonating ? `Viewing ${impersonatedUser?.email}'s Data` : 'Welcome back!'}
             </h1>
             <p className="text-xl text-muted-foreground">
-              Manage your candidate filtering workflows and access powerful admin tools
+              {isImpersonating 
+                ? `Manage filtering workflows for ${impersonatedUser?.email}`
+                : 'Manage your candidate filtering workflows and access powerful admin tools'
+              }
             </p>
           </div>
 

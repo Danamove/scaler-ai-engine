@@ -10,6 +10,7 @@ import { Filter, ArrowLeft, BarChart3, Download, Users, Building, FileText, Chec
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
 interface CandidateResult {
   id: string;
@@ -35,6 +36,7 @@ const Results = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [stats, setStats] = useState<FilterStats>({
@@ -55,7 +57,8 @@ const Results = () => {
   }, [user, loading, navigate]);
 
   const loadResults = async () => {
-    if (!user) return;
+    const activeUserId = getActiveUserId();
+    if (!activeUserId) return;
 
     try {
       setLoadingResults(true);
@@ -81,7 +84,7 @@ const Results = () => {
               profile_summary
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', activeUserId)
           .order('created_at', { ascending: false })
           .range(offset, offset + pageSize - 1);
 
@@ -350,6 +353,11 @@ const Results = () => {
             <h1 className="text-2xl font-bold text-foreground">Scaler</h1>
           </div>
           <div className="flex items-center space-x-4">
+            {isImpersonating && impersonatedUser && (
+              <Badge variant="default" className="bg-primary">
+                Viewing: {impersonatedUser.email}
+              </Badge>
+            )}
             <Badge variant="secondary">
               {user.email}
             </Badge>
@@ -371,9 +379,14 @@ const Results = () => {
             <div className="h-16 w-16 bg-accent/10 rounded-xl flex items-center justify-center mx-auto">
               <BarChart3 className="h-8 w-8 text-accent" />
             </div>
-            <h1 className="text-3xl font-bold">Filtering Results</h1>
+            <h1 className="text-3xl font-bold">
+              {isImpersonating ? `${impersonatedUser?.email}'s Filtering Results` : 'Filtering Results'}
+            </h1>
             <p className="text-xl text-muted-foreground">
-              Analysis of your candidate filtering process
+              {isImpersonating 
+                ? `Analysis of ${impersonatedUser?.email}'s candidate filtering process`
+                : 'Analysis of your candidate filtering process'
+              }
             </p>
           </div>
 

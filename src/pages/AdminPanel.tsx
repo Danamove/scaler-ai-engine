@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign } from 'lucide-react';
+import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminImpersonation, ALLOWED_USERS } from '@/hooks/useAdminImpersonation';
 
 interface Company {
   id: string;
@@ -39,12 +40,14 @@ const AdminPanel = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { impersonatedUser, setImpersonatedUser, canImpersonate } = useAdminImpersonation();
   
   // State management
   const [targetCompanies, setTargetCompanies] = useState<Company[]>([]);
   const [notRelevantCompanies, setNotRelevantCompanies] = useState<Company[]>([]);
   const [synonyms, setSynonyms] = useState<Synonym[]>([]);
   const [apiCosts, setApiCosts] = useState<ApiCost[]>([]);
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
   
   // Form states
   const [newTargetCompany, setNewTargetCompany] = useState({ name: '', category: '' });
@@ -77,17 +80,19 @@ const AdminPanel = () => {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [targetResponse, notRelevantResponse, synonymsResponse, costsResponse] = await Promise.all([
+      const [targetResponse, notRelevantResponse, synonymsResponse, costsResponse, profilesResponse] = await Promise.all([
         supabase.from('target_companies').select('*').order('company_name'),
         supabase.from('not_relevant_companies').select('*').order('company_name'),
         supabase.from('synonyms').select('*').order('canonical_term'),
-        supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100)
+        supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('profiles').select('*').in('email', ALLOWED_USERS).order('email')
       ]);
 
       if (targetResponse.data) setTargetCompanies(targetResponse.data);
       if (notRelevantResponse.data) setNotRelevantCompanies(notRelevantResponse.data);
       if (synonymsResponse.data) setSynonyms(synonymsResponse.data);
       if (costsResponse.data) setApiCosts(costsResponse.data);
+      if (profilesResponse.data) setUserProfiles(profilesResponse.data);
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -322,11 +327,12 @@ const AdminPanel = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="target-companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="target-companies">Target Companies</TabsTrigger>
             <TabsTrigger value="not-relevant">NotRelevant Companies</TabsTrigger>
             <TabsTrigger value="synonyms">Synonyms</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="impersonate">User Access</TabsTrigger>
             <TabsTrigger value="api-costs">API Costs</TabsTrigger>
           </TabsList>
 
@@ -616,6 +622,115 @@ const AdminPanel = () => {
                     Note: API keys should be updated through the Supabase dashboard secrets management for security.
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* User Impersonation Tab */}
+          <TabsContent value="impersonate" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  User Data Access
+                </CardTitle>
+                <CardDescription>
+                  Access other users' filtering data and results
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {impersonatedUser && (
+                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-primary">Currently viewing data for:</p>
+                        <p className="text-lg font-bold">{impersonatedUser.email}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setImpersonatedUser(null)}
+                      >
+                        Stop Viewing
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <h4 className="font-medium">Select User to View</h4>
+                  <div className="grid gap-3">
+                    {ALLOWED_USERS.map((email) => {
+                      const profile = userProfiles.find(p => p.email === email);
+                      const isActive = impersonatedUser?.email === email;
+                      
+                      return (
+                        <div 
+                          key={email} 
+                          className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                            isActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium">{email}</p>
+                            {profile && (
+                              <p className="text-sm text-muted-foreground">
+                                {profile.full_name || 'Name not set'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!profile && (
+                              <Badge variant="secondary">Not registered</Badge>
+                            )}
+                            <Button
+                              variant={isActive ? "default" : "outline"}
+                              size="sm"
+                              disabled={!profile}
+                              onClick={() => {
+                                if (isActive) {
+                                  setImpersonatedUser(null);
+                                } else if (profile) {
+                                  setImpersonatedUser({
+                                    email: profile.email,
+                                    user_id: profile.user_id
+                                  });
+                                }
+                              }}
+                            >
+                              {isActive ? 'Viewing' : 'View Data'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {impersonatedUser && (
+                  <div className="space-y-4">
+                    <Separator />
+                    <div className="space-y-3">
+                      <h4 className="font-medium">Quick Actions</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Link to="/dashboard">
+                          <Button variant="outline" size="sm">
+                            View Dashboard
+                          </Button>
+                        </Link>
+                        <Link to="/results">
+                          <Button variant="outline" size="sm">
+                            View Results
+                          </Button>
+                        </Link>
+                        <Link to="/filter-config">
+                          <Button variant="outline" size="sm">
+                            Filter Settings
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
