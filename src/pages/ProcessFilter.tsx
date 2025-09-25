@@ -161,28 +161,35 @@ const ProcessFilter = () => {
       });
 
       // Create synonym helper functions
-      const createSynonymMap = (category: string) => {
+      const createSynonymMap = (categories: string[]) => {
         const synonymMap = new Map<string, string[]>();
-        synonyms?.filter(s => s.category === category).forEach(s => {
+        synonyms?.filter(s => categories.includes(s.category)).forEach(s => {
           const canonical = s.canonical_term.toLowerCase();
           const variant = s.variant_term.toLowerCase();
           
           if (!synonymMap.has(canonical)) {
-            synonymMap.set(canonical, [canonical]);
+            synonymMap.set(canonical, []);
           }
-          synonymMap.get(canonical)!.push(variant);
+          if (!synonymMap.get(canonical)!.includes(variant)) {
+            synonymMap.get(canonical)!.push(variant);
+          }
           
-          // Also create reverse mapping
+          // Also map variant to canonical
           if (!synonymMap.has(variant)) {
-            synonymMap.set(variant, [canonical]);
+            synonymMap.set(variant, []);
           }
-          synonymMap.get(variant)!.push(canonical);
+          if (!synonymMap.get(variant)!.includes(canonical)) {
+            synonymMap.get(variant)!.push(canonical);
+          }
         });
         return synonymMap;
       };
 
-      const titleSynonyms = createSynonymMap('title');
-      const skillSynonyms = createSynonymMap('skill');
+      // Create comprehensive synonym maps for different use cases
+      const titleSynonyms = createSynonymMap(['titles', 'development_roles', 'management', 'data_roles', 'operations']);
+      const skillSynonyms = createSynonymMap(['skills', 'technologies', 'tools', 'domains']);
+      const experienceSynonyms = createSynonymMap(['experience_levels', 'experience']);
+      const companyTypeSynonyms = createSynonymMap(['company_types', 'companies']);
 
       const expandTermsWithSynonyms = (terms: string[], synonymMap: Map<string, string[]>) => {
         const expandedTerms = new Set<string>();
