@@ -130,6 +130,33 @@ export type Database = {
           },
         ]
       }
+      jobs: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          job_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          job_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          job_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       netly_files: {
         Row: {
           additional_data: Json | null
