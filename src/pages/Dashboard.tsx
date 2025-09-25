@@ -19,7 +19,7 @@ const Dashboard = () => {
   const handleRestart = async () => {
     if (!user) return;
     
-    const confirmRestart = window.confirm('האם אתה בטוח שברצונך להתחיל מחדש? פעולה זו תמחק את כל הנתונים הקיימים (קבצי CSV, תוצאות סינון, הגדרות סינון).');
+    const confirmRestart = window.confirm('Are you sure you want to restart? This action will delete all existing data (CSV files, filtering results, filter settings).');
     
     if (!confirmRestart) return;
     
@@ -37,8 +37,8 @@ const Dashboard = () => {
       ]);
       
       toast({
-        title: "Restart הושלם בהצלחה",
-        description: "כל הנתונים נמחקו. תוכל להתחיל מחדש.",
+        title: "Restart completed successfully",
+        description: "All data has been deleted. You can start fresh.",
       });
       
       // Navigate to upload page to start fresh
@@ -47,8 +47,8 @@ const Dashboard = () => {
     } catch (error: any) {
       console.error('Restart error:', error);
       toast({
-        title: "שגיאה ב-Restart",
-        description: error.message || "לא ניתן למחוק את הנתונים.",
+        title: "Restart Error",
+        description: error.message || "Failed to delete data.",
         variant: "destructive",
       });
     } finally {
