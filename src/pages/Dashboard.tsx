@@ -19,14 +19,8 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
-  console.log('Dashboard: Component starting');
-  
   const { user, signOut, loading } = useAuth();
-  console.log('Dashboard: useAuth loaded', { user: !!user, loading });
-  
   const { isAdmin } = useUserRole();
-  console.log('Dashboard: useUserRole loaded', { isAdmin });
-  
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isRestarting, setIsRestarting] = useState(false);
@@ -37,10 +31,7 @@ const Dashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   
-  console.log('Dashboard: Basic hooks loaded');
-  
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
-  console.log('Dashboard: useAdminImpersonation loaded');
 
   const handleRestartAll = async () => {
     const activeUserId = getActiveUserId();
