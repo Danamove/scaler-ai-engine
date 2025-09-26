@@ -37,12 +37,80 @@ const FilterConfig = () => {
   const [blacklistCompanies, setBlacklistCompanies] = useState('');
   const [pastCandidates, setPastCandidates] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  const [hasExistingData, setHasExistingData] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  // Load existing configuration data
+  useEffect(() => {
+    const loadExistingData = async () => {
+      if (!user) return;
+      
+      setLoadingData(true);
+      try {
+        // Load filter rules - get the most recent one
+        const { data: filterRules, error: filterError } = await supabase
+          .from('filter_rules')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (filterError && filterError.code !== 'PGRST116') {
+          console.error('Error loading filter rules:', filterError);
+        }
+
+        if (filterRules) {
+          setHasExistingData(true);
+          setConfig({
+            jobTitle: filterRules.job_id || '',
+            useNotRelevantFilter: filterRules.use_not_relevant_filter || false,
+            useTargetCompaniesFilter: filterRules.use_target_companies_filter || false,
+            minMonthsCurrentRole: filterRules.min_months_current_role || 0,
+            excludeTerms: (filterRules.exclude_terms || []).join(', '),
+            excludeLocationTerms: (filterRules.exclude_location_terms || []).join('\n'),
+            mustHaveTerms: (filterRules.must_have_terms || []).join(', '),
+            requiredTitles: (filterRules.required_titles || []).join(', '),
+            requireTopUni: filterRules.require_top_uni || false,
+          });
+
+          // Load blacklist companies for this job
+          const { data: blacklist } = await supabase
+            .from('user_blacklist')
+            .select('company_name')
+            .eq('user_id', user.id)
+            .eq('job_id', filterRules.job_id);
+          
+          if (blacklist?.length) {
+            setBlacklistCompanies(blacklist.map(b => b.company_name).join('\n'));
+          }
+
+          // Load past candidates for this job
+          const { data: pastCands } = await supabase
+            .from('user_past_candidates')
+            .select('candidate_name')
+            .eq('user_id', user.id)
+            .eq('job_id', filterRules.job_id);
+          
+          if (pastCands?.length) {
+            setPastCandidates(pastCands.map(c => c.candidate_name).join('\n'));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading existing data:', error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadExistingData();
+  }, [user]);
 
   if (loading) {
     return (
@@ -129,8 +197,8 @@ const FilterConfig = () => {
         description: `Filter rules for "${config.jobTitle}" have been saved successfully.`,
       });
 
-      // Navigate back to dashboard after successful save
-      setTimeout(() => navigate('/dashboard'), 1500);
+      // Mark that we now have existing data
+      setHasExistingData(true);
 
     } catch (error: any) {
       console.error('Save error:', error);
@@ -179,6 +247,17 @@ const FilterConfig = () => {
             <p className="text-xl text-muted-foreground">
               Set up your filtering rules and criteria for candidate screening
             </p>
+            {loadingData && (
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                <span>Loading existing configuration...</span>
+              </div>
+            )}
+            {hasExistingData && !loadingData && (
+              <Badge variant="secondary" className="mx-auto">
+                Loaded existing configuration
+              </Badge>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-1 gap-8">
@@ -368,16 +447,24 @@ const FilterConfig = () => {
           </div>
 
           {/* Save Button */}
-          <div className="flex justify-center pt-6">
+          <div className="flex justify-center pt-6 space-x-4">
             <Button 
               variant="hero" 
               size="xl" 
               onClick={handleSaveConfig}
-              disabled={saving}
+              disabled={saving || loadingData}
             >
               <Save className="h-5 w-5" />
               {saving ? 'Saving...' : 'Save Configuration'}
             </Button>
+            {hasExistingData && (
+              <Link to="/dashboard">
+                <Button variant="outline" size="xl">
+                  <ArrowLeft className="h-5 w-5" />
+                  Back to Dashboard
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>
