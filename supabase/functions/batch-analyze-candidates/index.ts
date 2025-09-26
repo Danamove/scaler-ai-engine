@@ -47,7 +47,8 @@ interface BatchAnalysisResult {
 
 // Retry configuration
 const MAX_RETRIES = 3;
-const INITIAL_DELAY = 1000; // 1 second
+const INITIAL_DELAY = 2000; // 2 seconds
+const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -147,37 +148,49 @@ Return JSON array with candidateId, passes_experience_check, passes_role_duratio
 
     console.log('Sending batch analysis request to OpenAI for', candidates.length, 'candidates');
 
-    // API call with retry logic
+    // API call with retry logic and timeout
     const makeOpenAICall = async () => {
-      return await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-5-nano-2025-08-07', // Faster, cheaper model
-          messages: [
-            {
-              role: 'system',
-              content: `Expert candidate screener. Score 1-10: Experience(vs req), RoleDuration(stability), MustHave(term presence), Exclude(0 if found), TopUni(if req). Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. Return JSON only.`
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_completion_tokens: 2000 // Reduced from 4000
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+      
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini', // More stable model
+            messages: [
+              {
+                role: 'system',
+                content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. Return valid JSON only.`
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            max_tokens: 2000,
+            temperature: 0.3
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
     };
 
     const openaiResponse = await retryWithBackoff(makeOpenAICall);
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+      console.error(`OpenAI API error (${openaiResponse.status}):`, errorText);
+      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText.substring(0, 200)}`);
     }
 
     const openaiData = await openaiResponse.json();
@@ -220,7 +233,7 @@ Return JSON array with candidateId, passes_experience_check, passes_role_duratio
 
     // Track API costs
     const tokensUsed = openaiData.usage?.total_tokens || 0;
-    const costPer1kTokens = 0.00003; // gpt-5-nano pricing (much cheaper)
+    const costPer1kTokens = 0.00015; // gpt-4o-mini pricing
     const totalCost = (tokensUsed / 1000) * costPer1kTokens;
 
     await supabase.from('api_costs').insert({

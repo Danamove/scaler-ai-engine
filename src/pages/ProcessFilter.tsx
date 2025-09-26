@@ -307,8 +307,8 @@ const ProcessFilter = () => {
         setCurrentStep(`Stage 2: AI analysis (0/${stage1PassedCandidates.length})...`);
         setProgress(60);
 
-        // Optimized batch processing: larger batches, parallel execution
-        const batchSize = Math.min(30, Math.ceil(stage1PassedCandidates.length / 4)); // Dynamic batch size
+        // Optimized batch processing: smaller batches for stability
+        const batchSize = Math.min(15, Math.ceil(stage1PassedCandidates.length / 6)); // Reduced batch size
         const maxParallelBatches = 3;
         const totalBatches = Math.ceil(stage1PassedCandidates.length / batchSize);
         let processedCount = 0;
@@ -576,23 +576,23 @@ const ProcessFilter = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="text-center p-3 bg-secondary rounded-lg">
+                <div className="text-center p-3 bg-white border rounded-lg">
                   <div className="text-2xl font-bold text-primary">{stats.totalCandidates}</div>
                   <div className="text-sm text-muted-foreground">Total</div>
                 </div>
-                <div className="text-center p-3 bg-secondary rounded-lg">
+                <div className="text-center p-3 bg-white border rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{stats.processed}</div>
                   <div className="text-sm text-muted-foreground">Processed</div>
                 </div>
-                <div className="text-center p-3 bg-secondary rounded-lg">
+                <div className="text-center p-3 bg-white border rounded-lg">
                   <div className="text-2xl font-bold text-green-600">{stats.stage1Passed}</div>
                   <div className="text-sm text-muted-foreground">Stage 1 ✓</div>
                 </div>
-                <div className="text-center p-3 bg-secondary rounded-lg">
+                <div className="text-center p-3 bg-white border rounded-lg">
                   <div className="text-2xl font-bold text-orange-600">{stats.stage2Passed}</div>
                   <div className="text-sm text-muted-foreground">Stage 2 ✓</div>
                 </div>
-                <div className="text-center p-3 bg-secondary rounded-lg">
+                <div className="text-center p-3 bg-white border rounded-lg">
                   <div className="text-2xl font-bold text-purple-600">{stats.finalResults}</div>
                   <div className="text-sm text-muted-foreground">Final Results</div>
                 </div>
