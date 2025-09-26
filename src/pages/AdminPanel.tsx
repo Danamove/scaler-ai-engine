@@ -39,7 +39,7 @@ interface ApiCost {
 
 const AdminPanel = () => {
   const { user, loading } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { impersonatedUser, setImpersonatedUser, canImpersonate } = useAdminImpersonation();
@@ -62,7 +62,7 @@ const AdminPanel = () => {
 
   // Check admin access
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
+    if (!loading && !roleLoading && (!user || !isAdmin)) {
       navigate('/dashboard');
       toast({
         title: "Access Denied",
@@ -70,7 +70,7 @@ const AdminPanel = () => {
         variant: "destructive",
       });
     }
-  }, [user, loading, isAdmin, navigate, toast]);
+  }, [user, loading, roleLoading, isAdmin, navigate, toast]);
 
   // Load data
   useEffect(() => {
