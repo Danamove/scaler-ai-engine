@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,9 @@ const Results = () => {
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   
+  const [searchParams] = useSearchParams();
+  const jobId = searchParams.get('job') || undefined;
+  
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [stats, setStats] = useState<FilterStats>({
     total_candidates: 0,
@@ -70,7 +73,8 @@ const Results = () => {
       const pageSize = 1000;
 
       while (hasMore) {
-        const { data: resultsPage, error } = await supabase
+        // Build query with optional job filter
+        let query = supabase
           .from('filtered_results')
           .select(`
             *,
@@ -87,6 +91,12 @@ const Results = () => {
           .eq('user_id', activeUserId)
           .order('created_at', { ascending: false })
           .range(offset, offset + pageSize - 1);
+
+        if (jobId) {
+          query = query.eq('job_id', jobId);
+        }
+
+        const { data: resultsPage, error } = await query;
 
         if (error) throw error;
 
@@ -380,13 +390,14 @@ const Results = () => {
               <BarChart3 className="h-8 w-8 text-accent" />
             </div>
             <h1 className="text-3xl font-bold">
-              {isImpersonating ? `${impersonatedUser?.email}'s Filtering Results` : 'Filtering Results'}
+              {jobId 
+                ? `Filtering Results — ${jobId}` 
+                : (isImpersonating ? `${impersonatedUser?.email}'s Filtering Results` : 'Filtering Results')}
             </h1>
             <p className="text-xl text-muted-foreground">
               {isImpersonating 
                 ? `Analysis of ${impersonatedUser?.email}'s candidate filtering process`
-                : 'Analysis of your candidate filtering process'
-              }
+                : 'Analysis of your candidate filtering process'}
             </p>
           </div>
 
