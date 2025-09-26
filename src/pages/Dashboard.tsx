@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw, Briefcase } from 'lucide-react';
+import { Filter, Upload, Settings, BarChart3, Users, LogOut, FileText, RotateCcw, Briefcase, Network } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
@@ -458,12 +458,12 @@ const Dashboard = () => {
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  Your latest filtering operations
+                  Your jobs - view results and manage filtering operations
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {jobs.slice(0, 3).map((job) => (
+                  {jobs.map((job) => (
                     <div key={job.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
@@ -476,13 +476,26 @@ const Dashboard = () => {
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline">Active</Badge>
+                      <div className="flex items-center space-x-2">
+                        <Link to={`/results?job=${job.job_id}`}>
+                          <Button variant="outline" size="sm">
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            Results
+                          </Button>
+                        </Link>
+                        <Link to={`/netly?job=${job.job_id}`}>
+                          <Button variant="outline" size="sm">
+                            <Network className="h-4 w-4 mr-1" />
+                            Network
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   ))}
                   
                   {jobs.length === 0 && (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">No recent activity</p>
+                      <p className="text-muted-foreground mb-4">No jobs yet</p>
                       <Link to="/upload">
                         <Button variant="outline">
                           <Upload className="h-4 w-4" />
