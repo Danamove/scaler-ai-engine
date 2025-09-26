@@ -71,9 +71,7 @@ const [resetSuccess, setResetSuccess] = useState(false);
 
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      const redirectUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:5173/auth'
-        : `${window.location.origin}/auth`;
+      const redirectUrl = `${window.location.origin}/auth`;
 
       const { error } = await supabase.auth.signInWithOtp({
         email: formData.email,
