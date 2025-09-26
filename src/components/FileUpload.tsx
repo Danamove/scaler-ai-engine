@@ -85,14 +85,7 @@ export const FileUpload = ({
     const activeUserId = userId || user?.id;
     if (!activeUserId) return;
 
-    if (!jobId) {
-      toast({
-        title: "Error",
-        description: "No job selected. Please select a job first.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const currentJobId = jobId || 'current';
 
     try {
       console.log('Transforming data for database...');
@@ -130,7 +123,7 @@ export const FileUpload = ({
 
         return {
           user_id: activeUserId,
-          job_id: jobId,
+          job_id: currentJobId,
           full_name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
           current_title: row.linkedinJobTitle || row.linkedinHeadline || '',
           current_company: row.companyName || '',

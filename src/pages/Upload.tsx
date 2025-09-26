@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from "@/hooks/useAuth";
 import { useAdminImpersonation } from "@/hooks/useAdminImpersonation";
-import { useActiveJob } from "@/hooks/useActiveJob";
 import { FileUpload } from "@/components/FileUpload";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,17 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const Upload = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { activeJob } = useActiveJob();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
-    if (!loading && user && !activeJob) {
-      navigate('/dashboard');
-    }
-  }, [user, loading, navigate, activeJob]);
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -82,12 +77,11 @@ const Upload = () => {
             </div>
             <h1 className="text-3xl font-bold">
               {isImpersonating ? `Upload Data for ${impersonatedUser?.email}` : 'Upload Raw Data'}
-              {activeJob && <span className="text-xl text-muted-foreground"> — {activeJob.jobName}</span>}
             </h1>
             <p className="text-xl text-muted-foreground">
               {isImpersonating 
                 ? `Upload candidate CSV file for ${impersonatedUser?.email} to start the filtering process`
-                : `Upload candidates for ${activeJob?.jobName || 'your job'}`
+                : 'Upload candidate CSV file to start the filtering process'
               }
             </p>
           </div>
@@ -95,11 +89,10 @@ const Upload = () => {
           {/* Upload Component */}
           <FileUpload
             title="Upload Candidate Data"
-            description={`Upload your LinkedIn scraped candidate CSV file for ${activeJob?.jobName || 'your job'}`}
+            description="Upload your LinkedIn scraped candidate CSV file"
             acceptedTypes=".csv"
             onUploadComplete={handleUploadComplete}
             userId={getActiveUserId()}
-            jobId={activeJob?.jobId}
           />
 
           {/* Info Card - Simplified */}

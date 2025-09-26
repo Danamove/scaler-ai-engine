@@ -38,9 +38,6 @@ const Results = () => {
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   
-  const [searchParams] = useSearchParams();
-  const jobId = searchParams.get('job') || undefined;
-  
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [stats, setStats] = useState<FilterStats>({
     total_candidates: 0,
@@ -73,7 +70,6 @@ const Results = () => {
       const pageSize = 1000;
 
       while (hasMore) {
-        // Build query with optional job filter
         let query = supabase
           .from('filtered_results')
           .select(`
@@ -91,10 +87,6 @@ const Results = () => {
           .eq('user_id', activeUserId)
           .order('created_at', { ascending: false })
           .range(offset, offset + pageSize - 1);
-
-        if (jobId) {
-          query = query.eq('job_id', jobId);
-        }
 
         const { data: resultsPage, error } = await query;
 
@@ -390,9 +382,7 @@ const Results = () => {
               <BarChart3 className="h-8 w-8 text-accent" />
             </div>
             <h1 className="text-3xl font-bold">
-              {jobId 
-                ? `Filtering Results — ${jobId}` 
-                : (isImpersonating ? `${impersonatedUser?.email}'s Filtering Results` : 'Filtering Results')}
+              {isImpersonating ? `${impersonatedUser?.email}'s Filtering Results` : 'Filtering Results'}
             </h1>
             <p className="text-xl text-muted-foreground">
               {isImpersonating 

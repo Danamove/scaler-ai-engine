@@ -1,15 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Filter, ArrowLeft, Play, CheckCircle, XCircle, Users, Building } from 'lucide-react';
+import { Filter, ArrowLeft, Play, CheckCircle, XCircle, Users, Building, RefreshCw, AlertCircle, PlayCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
-import { useActiveJob } from '@/hooks/useActiveJob';
 
 interface ProcessStats {
   totalCandidates: number;
@@ -24,7 +23,6 @@ const ProcessFilter = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
-  const { activeJob, loading: activeJobLoading } = useActiveJob();
   
   const [processing, setProcessing] = useState(false);
   const [stats, setStats] = useState<ProcessStats>({
@@ -41,23 +39,20 @@ const ProcessFilter = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
-    } else if (!activeJobLoading && !activeJob) {
-      navigate('/dashboard');
-    } else if (user && activeJob) {
+    } else if (user) {
       loadInitialStats();
     }
-  }, [user, loading, activeJob, activeJobLoading, navigate]);
+  }, [user, loading, navigate]);
 
   const loadInitialStats = async () => {
-    if (!user || !activeJob) return;
+    if (!user) return;
 
     try {
-      // Get total candidates for the active job
+      // Get total candidates for the user
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', getActiveUserId())
-        .eq('job_id', activeJob.jobId);
+        .eq('user_id', getActiveUserId());
 
       setStats(prev => ({ ...prev, totalCandidates: totalCandidates || 0 }));
     } catch (error) {
@@ -66,7 +61,7 @@ const ProcessFilter = () => {
   };
 
   const processFiltering = async () => {
-    if (!user || !activeJob || processing) return;
+    if (!user || processing) return;
 
     console.log('Starting filtering process...');
     setProcessing(true);
@@ -91,7 +86,6 @@ const ProcessFilter = () => {
           .from('raw_data')
           .select('*')
           .eq('user_id', getActiveUserId())
-          .eq('job_id', activeJob.jobId)
           .range(offset, offset + pageSize - 1);
 
         if (candidatesError) {
@@ -114,7 +108,6 @@ const ProcessFilter = () => {
         .from('filter_rules')
         .select('*')
         .eq('user_id', getActiveUserId())
-        .eq('job_id', activeJob.jobId)
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -151,14 +144,12 @@ const ProcessFilter = () => {
       const { data: blacklistCompanies } = await supabase
         .from('user_blacklist')
         .select('company_name')
-        .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('user_id', getActiveUserId());
 
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
-        .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('user_id', getActiveUserId());
 
       console.log('Loaded lists:', {
         synonyms: synonyms?.length || 0,
@@ -371,12 +362,11 @@ const ProcessFilter = () => {
         return { matched: false, reason: 'No sufficient title component matches found' };
       };
 
-      // Clear existing results for this job
+      // Clear existing results for the user
       const { error: deleteError } = await supabase
         .from('filtered_results')
         .delete()
-        .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('user_id', getActiveUserId());
 
       if (deleteError) {
         console.error('Error clearing previous results:', deleteError);
@@ -569,7 +559,7 @@ const ProcessFilter = () => {
                 results.push({
                   raw_data_id: candidate.id,
                   user_id: getActiveUserId(),
-                  job_id: filterRules.job_id,
+                  job_id: 'current',
                   stage_1_passed: true,
                   stage_2_passed: stage2Pass,
                   filter_reasons: filterReasons
