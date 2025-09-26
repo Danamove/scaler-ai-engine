@@ -52,7 +52,7 @@ const Index = () => {
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                   Filter candidate profiles with precision using built-in rules and dynamic filtering. 
-                  Streamline your recruitment process with enterprise-grade tools.
+                  Streamline your recruitment process with enterprise-grade tools. Access via secure email link.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -65,7 +65,7 @@ const Index = () => {
                 <Link to="/auth">
                   <Button variant="outline" size="xl">
                     <Settings className="h-5 w-5" />
-                    Admin Panel
+                    Sign In with Email
                   </Button>
                 </Link>
               </div>
@@ -325,7 +325,7 @@ const Index = () => {
               <Link to="/auth">
                 <Button variant="outline" size="xl">
                   <FileText className="h-5 w-5" />
-                  Access Netly Integration
+                  Sign In with Email
                 </Button>
               </Link>
             </div>
