@@ -44,9 +44,12 @@ const Auth = () => {
 
   // Detect Supabase recovery redirect
   useEffect(() => {
+    // Check both query string and hash for recovery type
+    const queryParams = new URLSearchParams(window.location.search);
     const hash = window.location.hash || '';
-    const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
-    if (params.get('type') === 'recovery') {
+    const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+    
+    if (queryParams.get('type') === 'recovery' || hashParams.get('type') === 'recovery') {
       setIsRecoveryMode(true);
     }
   }, []);
@@ -141,9 +144,19 @@ const Auth = () => {
   };
 
   const clearRecoveryHash = () => {
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
+    // Clean both hash and query parameters
+    const url = new URL(window.location.href);
+    
+    // Remove recovery-related query parameters
+    url.searchParams.delete('type');
+    url.searchParams.delete('access_token');
+    url.searchParams.delete('refresh_token');
+    
+    // Remove hash
+    url.hash = '';
+    
+    // Update URL without reload
+    history.replaceState(null, '', url.pathname + url.search);
   };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
