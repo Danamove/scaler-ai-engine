@@ -13,7 +13,8 @@ interface FileUploadProps {
   description: string;
   acceptedTypes?: string;
   onUploadComplete?: (data: any[]) => void;
-  userId?: string; // Allow custom user ID for admin impersonation
+  userId?: string;
+  jobId?: string;
 }
 
 export const FileUpload = ({ 
@@ -21,7 +22,8 @@ export const FileUpload = ({
   description, 
   acceptedTypes = ".csv",
   onUploadComplete,
-  userId // Custom user ID for admin impersonation
+  userId,
+  jobId
 }: FileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -83,6 +85,15 @@ export const FileUpload = ({
     const activeUserId = userId || user?.id;
     if (!activeUserId) return;
 
+    if (!jobId) {
+      toast({
+        title: "Error",
+        description: "No job selected. Please select a job first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       console.log('Transforming data for database...');
       setCurrentStep('Transforming candidate data...');
@@ -119,6 +130,7 @@ export const FileUpload = ({
 
         return {
           user_id: activeUserId,
+          job_id: jobId,
           full_name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
           current_title: row.linkedinJobTitle || row.linkedinHeadline || '',
           current_company: row.companyName || '',

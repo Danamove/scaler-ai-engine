@@ -10,9 +10,11 @@ import { Link } from 'react-router-dom';
 interface JobCardProps {
   job: Job;
   onDelete: (jobId: string) => void;
+  onSelect?: () => void;
+  isActive?: boolean;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
+export const JobCard: React.FC<JobCardProps> = ({ job, onDelete, onSelect, isActive = false }) => {
   const { getJobStats } = useJobManager();
   const [stats, setStats] = useState<JobStats>({ totalCandidates: 0, processedCandidates: 0, finalResults: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
@@ -37,11 +39,14 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
   };
 
   return (
-    <Card className="card-shadow transition-smooth hover:enterprise-shadow">
+    <Card className={`card-shadow transition-smooth hover:enterprise-shadow ${isActive ? 'ring-2 ring-primary' : ''}`}>
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg">{job.job_name}</CardTitle>
+          <div className="space-y-1 flex-1" onClick={onSelect} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
+            <div className="flex items-center space-x-2">
+              <CardTitle className="text-lg">{job.job_name}</CardTitle>
+              {isActive && <Badge variant="default">Active</Badge>}
+            </div>
             <CardDescription className="flex items-center space-x-2">
               <Calendar className="h-4 w-4" />
               <span>Created {formatDate(job.created_at)}</span>
@@ -106,13 +111,13 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onDelete }) => {
 
         {/* Actions */}
         <div className="flex space-x-2">
-          <Link to="/results" className="flex-1">
+          <Link to={`/results?job=${job.job_id}`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               <BarChart3 className="h-4 w-4" />
               Results
             </Button>
           </Link>
-          <Link to="/netly" className="flex-1">
+          <Link to={`/netly?job=${job.job_id}`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               <Users className="h-4 w-4" />
               Network

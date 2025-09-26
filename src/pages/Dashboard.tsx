@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 import { useJobManager } from '@/hooks/useJobManager';
+import { useActiveJob } from '@/hooks/useActiveJob';
 import { JobCard } from '@/components/JobCard';
 
 interface DashboardStats {
@@ -34,10 +35,26 @@ const Dashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   const { jobs, loading: jobsLoading, deleteJob } = useJobManager();
+  const { activeJob, setActiveJob, clearActiveJob } = useActiveJob();
   const [recentJobIds, setRecentJobIds] = useState<string[]>([]);
+
+  // Handle active job selection
+  const handleJobSelect = (jobId: string, jobName: string) => {
+    setActiveJob({ jobId, jobName });
+    toast({
+      title: "Active Job Changed",
+      description: `Switched to "${jobName}". All operations will now use this job.`,
+    });
+  };
 
   const handleJobDelete = async (jobId: string) => {
     await deleteJob(jobId);
+    
+    // If the deleted job was active, clear active job
+    if (activeJob?.jobId === jobId) {
+      clearActiveJob();
+    }
+    
     // Refresh stats after deletion
     fetchDashboardStats();
   };
@@ -261,13 +278,15 @@ const Dashboard = () => {
               </Card>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {jobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    onDelete={handleJobDelete}
-                  />
-                ))}
+              {jobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onDelete={handleJobDelete}
+                  onSelect={() => handleJobSelect(job.job_id, job.job_name)}
+                  isActive={activeJob?.jobId === job.job_id}
+                />
+              ))}
               </div>
             )}
           </div>

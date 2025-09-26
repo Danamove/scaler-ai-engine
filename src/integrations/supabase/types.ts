@@ -270,6 +270,7 @@ export type Database = {
           education: string | null
           full_name: string
           id: string
+          job_id: string
           linkedin_url: string | null
           months_in_current_role: number | null
           previous_company: string | null
@@ -284,6 +285,7 @@ export type Database = {
           education?: string | null
           full_name: string
           id?: string
+          job_id: string
           linkedin_url?: string | null
           months_in_current_role?: number | null
           previous_company?: string | null
@@ -298,6 +300,7 @@ export type Database = {
           education?: string | null
           full_name?: string
           id?: string
+          job_id?: string
           linkedin_url?: string | null
           months_in_current_role?: number | null
           previous_company?: string | null

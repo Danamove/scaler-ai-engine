@@ -1,22 +1,28 @@
 import { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Filter, ArrowLeft, Database, FileText } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { FileUpload } from '@/components/FileUpload';
-import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useAuth } from "@/hooks/useAuth";
+import { useAdminImpersonation } from "@/hooks/useAdminImpersonation";
+import { useActiveJob } from "@/hooks/useActiveJob";
+import { FileUpload } from "@/components/FileUpload";
+import { useNavigate, Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Filter, Database, FileText } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Upload = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { activeJob } = useActiveJob();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
-  }, [user, loading, navigate]);
+    if (!loading && user && !activeJob) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate, activeJob]);
 
   if (loading) {
     return (
@@ -76,11 +82,12 @@ const Upload = () => {
             </div>
             <h1 className="text-3xl font-bold">
               {isImpersonating ? `Upload Data for ${impersonatedUser?.email}` : 'Upload Raw Data'}
+              {activeJob && <span className="text-xl text-muted-foreground"> — {activeJob.jobName}</span>}
             </h1>
             <p className="text-xl text-muted-foreground">
               {isImpersonating 
                 ? `Upload candidate CSV file for ${impersonatedUser?.email} to start the filtering process`
-                : 'Upload your candidate CSV file to start the filtering process'
+                : `Upload candidates for ${activeJob?.jobName || 'your job'}`
               }
             </p>
           </div>
@@ -88,10 +95,11 @@ const Upload = () => {
           {/* Upload Component */}
           <FileUpload
             title="Upload Candidate Data"
-            description="Upload your LinkedIn scraped candidate CSV file to start the filtering process"
+            description={`Upload your LinkedIn scraped candidate CSV file for ${activeJob?.jobName || 'your job'}`}
             acceptedTypes=".csv"
             onUploadComplete={handleUploadComplete}
             userId={getActiveUserId()}
+            jobId={activeJob?.jobId}
           />
 
           {/* Info Card - Simplified */}
