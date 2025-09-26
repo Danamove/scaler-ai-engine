@@ -29,6 +29,12 @@ interface Synonym {
   category: string;
 }
 
+interface TopUniversity {
+  id: string;
+  university_name: string;
+  country: string;
+}
+
 interface ApiCost {
   id: string;
   function_name: string;
@@ -48,6 +54,7 @@ const AdminPanel = () => {
   const [targetCompanies, setTargetCompanies] = useState<Company[]>([]);
   const [notRelevantCompanies, setNotRelevantCompanies] = useState<Company[]>([]);
   const [synonyms, setSynonyms] = useState<Synonym[]>([]);
+  const [topUniversities, setTopUniversities] = useState<TopUniversity[]>([]);
   const [apiCosts, setApiCosts] = useState<ApiCost[]>([]);
   const [userProfiles, setUserProfiles] = useState<any[]>([]);
   
@@ -55,6 +62,7 @@ const AdminPanel = () => {
   const [newTargetCompany, setNewTargetCompany] = useState({ name: '', category: '' });
   const [newNotRelevantCompany, setNewNotRelevantCompany] = useState({ name: '', category: '' });
   const [newSynonym, setNewSynonym] = useState({ canonicalTerm: '', variantTerm: '', category: 'skill' });
+  const [newTopUniversity, setNewTopUniversity] = useState({ name: '', country: 'Israel' });
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
   
@@ -82,10 +90,11 @@ const AdminPanel = () => {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [targetResponse, notRelevantResponse, synonymsResponse, costsResponse, profilesResponse] = await Promise.all([
+      const [targetResponse, notRelevantResponse, synonymsResponse, universitiesResponse, costsResponse, profilesResponse] = await Promise.all([
         supabase.from('target_companies').select('*').order('company_name'),
         supabase.from('not_relevant_companies').select('*').order('company_name'),
         supabase.from('synonyms').select('*').order('canonical_term'),
+        supabase.from('top_universities').select('*').order('university_name'),
         supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('*').order('email')
       ]);
@@ -93,6 +102,7 @@ const AdminPanel = () => {
       if (targetResponse.data) setTargetCompanies(targetResponse.data);
       if (notRelevantResponse.data) setNotRelevantCompanies(notRelevantResponse.data);
       if (synonymsResponse.data) setSynonyms(synonymsResponse.data);
+      if (universitiesResponse.data) setTopUniversities(universitiesResponse.data);
       if (costsResponse.data) setApiCosts(costsResponse.data);
       if (profilesResponse.data) setUserProfiles(profilesResponse.data);
     } catch (error: any) {
@@ -208,6 +218,60 @@ const AdminPanel = () => {
     } catch (error: any) {
       toast({
         title: "Error deleting company",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Top Universities Management
+  const addTopUniversity = async () => {
+    if (!newTopUniversity.name.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('top_universities')
+        .insert({ 
+          university_name: newTopUniversity.name.trim(),
+          country: newTopUniversity.country.trim()
+        });
+
+      if (error) throw error;
+
+      setNewTopUniversity({ name: '', country: 'Israel' });
+      loadAllData();
+      toast({
+        title: "Top university added",
+        description: `${newTopUniversity.name} added successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error adding university",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteTopUniversity = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from('top_universities')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      loadAllData();
+      toast({
+        title: "University deleted",
+        description: `${name} removed from top universities`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting university",
         description: error.message,
         variant: "destructive",
       });
@@ -418,10 +482,11 @@ const AdminPanel = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="target-companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="target-companies">Target Companies</TabsTrigger>
             <TabsTrigger value="not-relevant">NotRelevant Companies</TabsTrigger>
             <TabsTrigger value="synonyms">Synonyms</TabsTrigger>
+            <TabsTrigger value="top-universities">Top Universities</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="impersonate">User Access</TabsTrigger>
             <TabsTrigger value="api-costs">API Costs</TabsTrigger>
@@ -640,6 +705,85 @@ const AdminPanel = () => {
                           variant="destructive"
                           size="sm"
                           onClick={() => deleteSynonym(synonym.id, synonym.canonical_term, synonym.variant_term)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Top Universities Tab */}
+          <TabsContent value="top-universities" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Top Universities Management
+                </CardTitle>
+                <CardDescription>
+                  Manage the list of top universities for filtering requirements
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="university-name">University Name</Label>
+                    <Input
+                      id="university-name"
+                      value={newTopUniversity.name}
+                      onChange={(e) => setNewTopUniversity(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., Tel Aviv University, MIT"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="university-country">Country</Label>
+                    <Select
+                      value={newTopUniversity.country}
+                      onValueChange={(value) => setNewTopUniversity(prev => ({ ...prev, country: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Israel">Israel</SelectItem>
+                        <SelectItem value="United States">United States</SelectItem>
+                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                        <SelectItem value="Canada">Canada</SelectItem>
+                        <SelectItem value="Germany">Germany</SelectItem>
+                        <SelectItem value="France">France</SelectItem>
+                        <SelectItem value="Switzerland">Switzerland</SelectItem>
+                        <SelectItem value="Netherlands">Netherlands</SelectItem>
+                        <SelectItem value="Denmark">Denmark</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={addTopUniversity} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add University
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Current Top Universities ({topUniversities.length})</h4>
+                  <div className="max-h-96 overflow-y-auto space-y-2">
+                    {topUniversities.map((university) => (
+                      <div key={university.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <span className="font-medium">{university.university_name}</span>
+                          <Badge variant="outline" className="ml-2">{university.country}</Badge>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTopUniversity(university.id, university.university_name)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
