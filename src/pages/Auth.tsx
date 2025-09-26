@@ -39,7 +39,36 @@ const [resetSuccess, setResetSuccess] = useState(false);
     }
   }, [user, navigate]);
 
-  // Detect Supabase recovery redirect
+  // Detect Supabase auth callback and exchange code for a session
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const errorDesc = url.searchParams.get('error_description');
+        if (errorDesc) {
+          setErrors({ general: decodeURIComponent(errorDesc) });
+          return;
+        }
+        const code = url.searchParams.get('code');
+        if (code) {
+          const { supabase } = await import('@/integrations/supabase/client');
+          setLoading(true);
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            setErrors({ general: error.message });
+          } else {
+            navigate('/dashboard');
+          }
+        }
+      } catch (e) {
+        console.error('Auth callback error', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleCallback();
+  }, [navigate]);
 
   const validateForm = () => {
     try {
