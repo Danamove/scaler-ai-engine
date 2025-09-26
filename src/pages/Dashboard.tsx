@@ -34,6 +34,7 @@ const Dashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   const { jobs, loading: jobsLoading, deleteJob } = useJobManager();
+  const [recentJobIds, setRecentJobIds] = useState<string[]>([]);
 
   const handleJobDelete = async (jobId: string) => {
     await deleteJob(jobId);
@@ -119,6 +120,8 @@ const Dashboard = () => {
 
       const uniqueJobIds = new Set(jobIds?.map(row => row.job_id) || []);
       const activeJobs = uniqueJobIds.size;
+
+      setRecentJobIds(Array.from(uniqueJobIds).slice(0, 10) as string[]);
 
       setStats({
         totalCandidates: totalCandidates || 0,
@@ -463,27 +466,25 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {jobs.map((job) => (
-                    <div key={job.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  {recentJobIds.map((jobId) => (
+                    <div key={jobId} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="h-8 w-8 bg-primary/20 rounded-full flex items-center justify-center">
                           <FileText className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium">{job.job_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Updated {new Date(job.updated_at).toLocaleDateString('en-US')}
-                          </p>
+                          <p className="font-medium">{jobId}</p>
+                          <p className="text-sm text-muted-foreground">Open results</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Link to={`/results?job=${job.job_id}`}>
+                        <Link to={`/results?job=${jobId}`}>
                           <Button variant="outline" size="sm">
                             <BarChart3 className="h-4 w-4 mr-1" />
                             Results
                           </Button>
                         </Link>
-                        <Link to={`/netly?job=${job.job_id}`}>
+                        <Link to={`/netly?job=${jobId}`}>
                           <Button variant="outline" size="sm">
                             <Network className="h-4 w-4 mr-1" />
                             Network
@@ -493,7 +494,7 @@ const Dashboard = () => {
                     </div>
                   ))}
                   
-                  {jobs.length === 0 && (
+                  {recentJobIds.length === 0 && (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground mb-4">No jobs yet</p>
                       <Link to="/upload">
