@@ -449,7 +449,7 @@ const ProcessFilter = () => {
           results.push({
             raw_data_id: candidate.id,
             user_id: getActiveUserId(),
-            job_id: filterRules.job_id,
+            job_id: 'current',
             stage_1_passed: false,
             stage_2_passed: false,
             filter_reasons: filterReasons
@@ -499,6 +499,8 @@ const ProcessFilter = () => {
               }
             );
 
+            console.log(`Batch ${batchIndex + 1} completed. Error:`, batchError, 'Results:', batchResults);
+
             if (batchError) {
               console.error('Batch AI Analysis error:', batchError);
               // Fallback to basic checks for this batch
@@ -524,7 +526,7 @@ const ProcessFilter = () => {
                 results.push({
                   raw_data_id: candidate.id,
                   user_id: getActiveUserId(),
-                  job_id: filterRules.job_id,
+                  job_id: 'current',
                   stage_1_passed: true,
                   stage_2_passed: stage2Pass,
                   filter_reasons: filterReasons
@@ -585,7 +587,7 @@ const ProcessFilter = () => {
               results.push({
                 raw_data_id: candidate.id,
                 user_id: getActiveUserId(),
-                job_id: filterRules.job_id,
+                job_id: 'current',
                 stage_1_passed: true,
                 stage_2_passed: stage2Pass,
                 filter_reasons: filterReasons
@@ -595,12 +597,16 @@ const ProcessFilter = () => {
 
           // Update progress for each batch
           const batchProgress = Math.floor(50 + ((batchIndex + 1) / batches.length) * 30);
+          console.log(`Batch ${batchIndex + 1}/${batches.length} processed. Setting progress to ${batchProgress}%`);
           setProgress(batchProgress);
           setStats(prev => ({ 
             ...prev, 
             stage2Passed: stage2Passed,
             finalResults: stage2Passed
           }));
+
+          // Add a small delay to ensure UI updates
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
