@@ -378,16 +378,16 @@ const FilterConfig = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="excludeLocation">החרגת מיקום</Label>
+                    <Label htmlFor="excludeLocation">Location Exclusions</Label>
                     <Textarea
                       id="excludeLocation"
-                      placeholder="ירושלים&#10;צפון&#10;באר שבע"
+                      placeholder="Jerusalem&#10;North&#10;Beer Sheva"
                       rows={4}
                       value={config.excludeLocationTerms}
                       onChange={(e) => setConfig({...config, excludeLocationTerms: e.target.value})}
                     />
                     <p className="text-xs text-muted-foreground">
-                      מיקומים להחרגה (עיר, אזור) - אחד בכל שורה. בדיקה רק מול מיקום המועמד
+                      Locations to exclude (city, region) - one per line. Checked against candidate location only
                     </p>
                   </div>
                 </div>
