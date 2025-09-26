@@ -45,6 +45,26 @@ interface BatchAnalysisResult {
   overall_pass: boolean;
 }
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_DELAY = 1000; // 1 second
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const retryWithBackoff = async (fn: () => Promise<any>, retries = MAX_RETRIES): Promise<any> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries > 0) {
+      const delay = INITIAL_DELAY * Math.pow(2, MAX_RETRIES - retries);
+      console.log(`Retrying in ${delay}ms... (${retries} attempts left)`);
+      await sleep(delay);
+      return retryWithBackoff(fn, retries - 1);
+    }
+    throw error;
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -88,7 +108,7 @@ serve(async (req) => {
       topUniversities = unis?.map(u => u.university_name.toLowerCase()) || [];
     }
 
-    // Create batch prompt for multiple candidates
+    // Create optimized batch prompt for multiple candidates
     const createBatchPrompt = (candidates: CandidateProfile[], filterRules: FilterRules, synonyms: any[]) => {
       const synonymMap = new Map<string, string[]>();
       synonyms.forEach(s => {
@@ -111,94 +131,48 @@ serve(async (req) => {
       };
 
       const candidatesData = candidates.map((candidate, index) => {
-        return `
-CANDIDATE ${index + 1} (ID: ${candidate.id}):
-Name: ${candidate.full_name}
-Current Title: ${candidate.current_title || 'N/A'}
-Current Company: ${candidate.current_company || 'N/A'}
-Previous Company: ${candidate.previous_company || 'N/A'}
-Years of Experience: ${candidate.years_of_experience || 'N/A'}
-Months in Current Role: ${candidate.months_in_current_role || 'N/A'}
-Education: ${candidate.education || 'N/A'}
-Profile Summary: ${candidate.profile_summary || 'N/A'}
-`;
-      }).join('\n---\n');
+        return `${index + 1}. ID:${candidate.id} Name:${candidate.full_name} Title:${candidate.current_title || 'N/A'} Company:${candidate.current_company || 'N/A'} Exp:${candidate.years_of_experience || 'N/A'}y Role:${candidate.months_in_current_role || 'N/A'}m Edu:${candidate.education || 'N/A'} Summary:${(candidate.profile_summary || '').substring(0, 200)}`;
+      }).join('\n');
 
-      return `
-Please analyze the following ${candidates.length} candidates against the specified filter rules.
+      return `Analyze ${candidates.length} candidates:
 
-FILTER RULES:
-- Minimum Years of Experience: ${filterRules.min_years_experience || 0}
-- Minimum Months in Current Role: ${filterRules.min_months_current_role || 0}
-- Must-Have Terms: ${filterRules.must_have_terms ? JSON.stringify(expandTerms(filterRules.must_have_terms)) : 'None'}
-- Exclude Terms: ${filterRules.exclude_terms ? JSON.stringify(expandTerms(filterRules.exclude_terms)) : 'None'}
-- Required Titles: ${filterRules.required_titles ? JSON.stringify(expandTerms(filterRules.required_titles)) : 'None'}
-- Top University Required: ${filterRules.require_top_uni ? 'Yes' : 'No'}
+RULES: MinExp:${filterRules.min_years_experience || 0}y MinRole:${filterRules.min_months_current_role || 0}m MustHave:${filterRules.must_have_terms ? JSON.stringify(expandTerms(filterRules.must_have_terms)) : 'None'} Exclude:${filterRules.exclude_terms ? JSON.stringify(expandTerms(filterRules.exclude_terms)) : 'None'} Titles:${filterRules.required_titles ? JSON.stringify(expandTerms(filterRules.required_titles)) : 'None'} TopUni:${filterRules.require_top_uni ? 'Yes' : 'No'}
 
-CANDIDATES:
 ${candidatesData}
 
-For each candidate, provide a JSON object with:
-- candidateId: the candidate's ID
-- passes_experience_check: boolean
-- passes_role_duration_check: boolean  
-- passes_must_have_terms_check: boolean
-- passes_exclude_terms_check: boolean
-- passes_top_university_check: boolean (if required)
-- experience_score: 1-10
-- role_duration_score: 1-10
-- must_have_terms_score: 1-10
-- exclude_terms_score: 1-10
-- top_university_score: 1-10 (if required)
-- reasoning: brief explanation
-- overall_pass: boolean (true if all checks pass)
-
-Return as JSON array: [result1, result2, ...]
-`;
+Return JSON array with candidateId, passes_experience_check, passes_role_duration_check, passes_must_have_terms_check, passes_exclude_terms_check, passes_top_university_check(if req), experience_score(1-10), role_duration_score(1-10), must_have_terms_score(1-10), exclude_terms_score(1-10), top_university_score(1-10,if req), reasoning(brief), overall_pass(bool).`;
     };
 
     const prompt = createBatchPrompt(candidates, filterRules, synonyms);
 
     console.log('Sending batch analysis request to OpenAI for', candidates.length, 'candidates');
 
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert candidate screening assistant. Analyze candidates thoroughly but efficiently.
-            
-SCORING GUIDELINES:
-- Experience: 10 = exceeds requirement significantly, 7-9 = meets requirement well, 4-6 = borderline, 1-3 = below requirement
-- Role Duration: 10 = very stable (2+ years), 7-9 = stable (1-2 years), 4-6 = moderate (6-12 months), 1-3 = short tenure
-- Must-Have Terms: 10 = all terms clearly present, 7-9 = most terms present, 4-6 = some terms present, 1-3 = few/no terms
-- Exclude Terms: 10 = no excluded terms, 1 = excluded terms found
-- Top University: 10 = top university, 1 = not top university
+    // API call with retry logic
+    const makeOpenAICall = async () => {
+      return await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-nano-2025-08-07', // Faster, cheaper model
+          messages: [
+            {
+              role: 'system',
+              content: `Expert candidate screener. Score 1-10: Experience(vs req), RoleDuration(stability), MustHave(term presence), Exclude(0 if found), TopUni(if req). Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. Return JSON only.`
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_completion_tokens: 2000 // Reduced from 4000
+        }),
+      });
+    };
 
-SEMANTIC EQUIVALENCES:
-- "engineer" = "developer" = "programmer" = "coder"  
-- "backend" = "back-end" = "server-side" = "API"
-- "frontend" = "front-end" = "client-side" = "UI"
-- "senior" = "lead" = "principal" = "staff" (for seniority)
-- "manager" = "lead" = "head of" = "director" (for management)
-
-Return valid JSON array only.`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 4000
-      }),
-    });
+    const openaiResponse = await retryWithBackoff(makeOpenAICall);
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
@@ -246,7 +220,7 @@ Return valid JSON array only.`
 
     // Track API costs
     const tokensUsed = openaiData.usage?.total_tokens || 0;
-    const costPer1kTokens = 0.00015; // gpt-4o-mini pricing
+    const costPer1kTokens = 0.00003; // gpt-5-nano pricing (much cheaper)
     const totalCost = (tokensUsed / 1000) * costPer1kTokens;
 
     await supabase.from('api_costs').insert({
@@ -269,6 +243,19 @@ Return valid JSON array only.`
 
   } catch (error) {
     console.error('Error in batch-analyze-candidates function:', error);
+    
+    // Return fallback analysis for client-side basic filtering
+    if (error instanceof Error && error.message.includes('OpenAI')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'AI_ANALYSIS_FAILED', 
+          fallback: true,
+          message: 'OpenAI analysis failed, using fallback filtering' 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
