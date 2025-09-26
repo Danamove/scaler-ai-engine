@@ -411,15 +411,28 @@ const ProcessFilter = () => {
                   const filterReasons = [...item.filterReasons];
                   let stage2Pass = true;
 
-                  // Basic fallback checks
-                  if (candidate.years_of_experience < (filterRules.min_years_experience || 0)) {
-                    stage2Pass = false;
-                    filterReasons.push(`Insufficient experience: ${candidate.years_of_experience} years`);
-                  }
-
+                  // Basic fallback checks - only months in current role
                   if (stage2Pass && candidate.months_in_current_role < (filterRules.min_months_current_role || 0)) {
                     stage2Pass = false;
                     filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role} months`);
+                  }
+
+                  // Basic location exclusion check (simple fallback)
+                  if (stage2Pass && filterRules.exclude_location_terms && filterRules.exclude_location_terms.length > 0) {
+                    const candidateLocation = [
+                      candidate.education,
+                      candidate.profile_summary,
+                      candidate.current_company
+                    ].join(' ').toLowerCase();
+                    
+                    const hasExcludedLocation = filterRules.exclude_location_terms.some(term => 
+                      candidateLocation.includes(term.toLowerCase())
+                    );
+                    
+                    if (hasExcludedLocation) {
+                      stage2Pass = false;
+                      filterReasons.push(`Excluded location detected`);
+                    }
                   }
 
                   if (stage2Pass) stage2Passed++;

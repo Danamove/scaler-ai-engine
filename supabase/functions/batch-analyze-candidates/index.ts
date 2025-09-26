@@ -21,25 +21,25 @@ interface CandidateProfile {
 }
 
 interface FilterRules {
-  min_years_experience?: number;
   min_months_current_role?: number;
   must_have_terms?: string[];
   exclude_terms?: string[];
+  exclude_location_terms?: string[];
   required_titles?: string[];
   require_top_uni?: boolean;
 }
 
 interface BatchAnalysisResult {
   candidateId: string;
-  passes_experience_check: boolean;
   passes_role_duration_check: boolean;
   passes_must_have_terms_check: boolean;
   passes_exclude_terms_check: boolean;
+  passes_location_exclusion_check: boolean;
   passes_top_university_check?: boolean;
-  experience_score: number;
   role_duration_score: number;
   must_have_terms_score: number;
   exclude_terms_score: number;
+  location_exclusion_score: number;
   top_university_score?: number;
   reasoning: string;
   overall_pass: boolean;
@@ -110,6 +110,54 @@ serve(async (req) => {
     }
 
     // Create optimized batch prompt for multiple candidates
+    // Israeli location terms (cities, regions, areas)
+    const israeliLocations = [
+      // Major cities (Hebrew)
+      'תל אביב', 'ירושלים', 'חיפה', 'באר שבע', 'נתניה', 'רחובות', 'פתח תקווה', 'אשדוד', 'אשקלון', 
+      'רמת גן', 'בני ברק', 'רעננה', 'הרצליה', 'כפר סבא', 'ראשון לציון', 'הוד השרון', 'גבעתיים',
+      // Major cities (English)
+      'tel aviv', 'jerusalem', 'haifa', 'beer sheva', 'netanya', 'rehovot', 'petah tikva', 'ashdod', 'ashkelon',
+      'ramat gan', 'bnei brak', 'raanana', 'herzliya', 'kfar saba', 'rishon lezion', 'hod hasharon', 'givatayim',
+      // Regions (Hebrew)
+      'צפון', 'דרום', 'מרכז', 'שפלה', 'גליל', 'נגב', 'שרון', 'יהודה ושומרון',
+      // Regions (English)
+      'north', 'south', 'center', 'galilee', 'negev', 'sharon'
+    ];
+
+    // Function to extract location from candidate profile
+    const extractCandidateLocation = (candidate: CandidateProfile): string => {
+      const locationSources = [
+        candidate.education || '',
+        candidate.profile_summary || '',
+        candidate.current_company || ''
+      ];
+      return locationSources.join(' ').toLowerCase();
+    };
+
+    // Function to check if candidate should be excluded based on location
+    const shouldExcludeBasedOnLocation = (candidate: CandidateProfile, excludeLocationTerms: string[]): boolean => {
+      if (!excludeLocationTerms || excludeLocationTerms.length === 0) return false;
+      
+      const candidateLocation = extractCandidateLocation(candidate);
+      
+      return excludeLocationTerms.some(excludeTerm => {
+        const term = excludeTerm.toLowerCase().trim();
+        if (!term) return false;
+        
+        // Check if the exclude term is a known Israeli location
+        const isLocationTerm = israeliLocations.some(location => 
+          location.toLowerCase().includes(term) || term.includes(location.toLowerCase())
+        );
+        
+        if (isLocationTerm) {
+          // Only check against candidate's location if it's a location term
+          return candidateLocation.includes(term);
+        }
+        
+        return false; // If not a location term, don't exclude based on location
+      });
+    };
+
     const createBatchPrompt = (candidates: CandidateProfile[], filterRules: FilterRules, synonyms: any[]) => {
       const synonymMap = new Map<string, string[]>();
       synonyms.forEach(s => {
@@ -137,11 +185,13 @@ serve(async (req) => {
 
       return `Analyze ${candidates.length} candidates:
 
-RULES: MinExp:${filterRules.min_years_experience || 0}y MinRole:${filterRules.min_months_current_role || 0}m MustHave:${filterRules.must_have_terms ? JSON.stringify(expandTerms(filterRules.must_have_terms)) : 'None'} Exclude:${filterRules.exclude_terms ? JSON.stringify(expandTerms(filterRules.exclude_terms)) : 'None'} Titles:${filterRules.required_titles ? JSON.stringify(expandTerms(filterRules.required_titles)) : 'None'} TopUni:${filterRules.require_top_uni ? 'Yes' : 'No'}
+RULES: MinRole:${filterRules.min_months_current_role || 0}m MustHave:${filterRules.must_have_terms ? JSON.stringify(expandTerms(filterRules.must_have_terms)) : 'None'} Exclude:${filterRules.exclude_terms ? JSON.stringify(expandTerms(filterRules.exclude_terms)) : 'None'} ExcludeLocation:${filterRules.exclude_location_terms ? JSON.stringify(filterRules.exclude_location_terms) : 'None'} Titles:${filterRules.required_titles ? JSON.stringify(expandTerms(filterRules.required_titles)) : 'None'} TopUni:${filterRules.require_top_uni ? 'Yes' : 'No'}
 
 ${candidatesData}
 
-Return JSON array with candidateId, passes_experience_check, passes_role_duration_check, passes_must_have_terms_check, passes_exclude_terms_check, passes_top_university_check(if req), experience_score(1-10), role_duration_score(1-10), must_have_terms_score(1-10), exclude_terms_score(1-10), top_university_score(1-10,if req), reasoning(brief), overall_pass(bool).`;
+Return JSON array with candidateId, passes_role_duration_check, passes_must_have_terms_check, passes_exclude_terms_check, passes_location_exclusion_check, passes_top_university_check(if req), role_duration_score(1-10), must_have_terms_score(1-10), exclude_terms_score(1-10), location_exclusion_score(1-10), top_university_score(1-10,if req), reasoning(brief), overall_pass(bool).
+
+IMPORTANT: For location exclusion - only check ExcludeLocation terms against candidate's actual location (from education, current company, or explicit location mentions), NOT against entire profile.`;
     };
 
     const prompt = createBatchPrompt(candidates, filterRules, synonyms);
@@ -165,7 +215,11 @@ Return JSON array with candidateId, passes_experience_check, passes_role_duratio
             messages: [
               {
                 role: 'system',
-                content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. Return valid JSON only.`
+                content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. 
+
+CRITICAL: For location exclusion (passes_location_exclusion_check) - ONLY check ExcludeLocation terms against candidate's actual location (education, current company location), NOT against skills, job titles, or other profile content. Location terms should only match location data.
+
+Return valid JSON only.`
               },
               {
                 role: 'user',
@@ -209,6 +263,23 @@ Return JSON array with candidateId, passes_experience_check, passes_role_duratio
       console.error('Failed to parse OpenAI response:', openaiData.choices[0].message.content);
       throw new Error('Failed to parse AI analysis results');
     }
+
+    // Add deterministic location exclusion logic for reliable results
+    analysisResults.forEach((result, index) => {
+      const candidate = candidates.find(c => c.id === result.candidateId) || candidates[index];
+      if (candidate && filterRules.exclude_location_terms) {
+        const shouldExclude = shouldExcludeBasedOnLocation(candidate, filterRules.exclude_location_terms);
+        result.passes_location_exclusion_check = !shouldExclude;
+        result.location_exclusion_score = shouldExclude ? 1 : 10;
+        if (shouldExclude) {
+          result.overall_pass = false;
+          result.reasoning += ' Location excluded.';
+        }
+      } else {
+        result.passes_location_exclusion_check = true;
+        result.location_exclusion_score = 10;
+      }
+    });
 
     // Add top university check if required
     if (filterRules.require_top_uni && topUniversities.length > 0) {

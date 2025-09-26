@@ -71,11 +71,11 @@ export type Database = {
       filter_rules: {
         Row: {
           created_at: string
+          exclude_location_terms: string[] | null
           exclude_terms: string[] | null
           id: string
           job_id: string
           min_months_current_role: number | null
-          min_years_experience: number | null
           must_have_terms: string[] | null
           require_top_uni: boolean | null
           required_titles: string[] | null
@@ -86,11 +86,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          exclude_location_terms?: string[] | null
           exclude_terms?: string[] | null
           id?: string
           job_id: string
           min_months_current_role?: number | null
-          min_years_experience?: number | null
           must_have_terms?: string[] | null
           require_top_uni?: boolean | null
           required_titles?: string[] | null
@@ -101,11 +101,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          exclude_location_terms?: string[] | null
           exclude_terms?: string[] | null
           id?: string
           job_id?: string
           min_months_current_role?: number | null
-          min_years_experience?: number | null
           must_have_terms?: string[] | null
           require_top_uni?: boolean | null
           required_titles?: string[] | null

@@ -26,9 +26,9 @@ const FilterConfig = () => {
     useNotRelevantFilter: false,
     useTargetCompaniesFilter: false,
     // Stage 2 Filters
-    minYearsExperience: 0,
     minMonthsCurrentRole: 0,
     excludeTerms: '',
+    excludeLocationTerms: '',
     mustHaveTerms: '',
     requiredTitles: '',
     requireTopUni: false,
@@ -82,9 +82,9 @@ const FilterConfig = () => {
           use_not_relevant_filter: config.useNotRelevantFilter,
           use_target_companies_filter: config.useTargetCompaniesFilter,
           // Stage 2 settings
-          min_years_experience: config.minYearsExperience,
           min_months_current_role: config.minMonthsCurrentRole,
           exclude_terms: config.excludeTerms.split(',').map(t => t.trim()).filter(Boolean),
+          exclude_location_terms: config.excludeLocationTerms.split('\n').map(t => t.trim()).filter(Boolean),
           must_have_terms: config.mustHaveTerms.split(',').map(t => t.trim()).filter(Boolean),
           required_titles: config.requiredTitles.split(',').map(t => t.trim()).filter(Boolean),
           require_top_uni: config.requireTopUni,
@@ -289,16 +289,6 @@ const FilterConfig = () => {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="minYears">Minimum Years Experience</Label>
-                    <Input
-                      id="minYears"
-                      type="number"
-                      min="0"
-                      value={config.minYearsExperience}
-                      onChange={(e) => setConfig({...config, minYearsExperience: parseInt(e.target.value) || 0})}
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="minMonths">Minimum Months in Current Role</Label>
                     <Input
                       id="minMonths"
@@ -307,6 +297,19 @@ const FilterConfig = () => {
                       value={config.minMonthsCurrentRole}
                       onChange={(e) => setConfig({...config, minMonthsCurrentRole: parseInt(e.target.value) || 0})}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="excludeLocation">החרגת מיקום</Label>
+                    <Textarea
+                      id="excludeLocation"
+                      placeholder="ירושלים&#10;צפון&#10;באר שבע"
+                      rows={4}
+                      value={config.excludeLocationTerms}
+                      onChange={(e) => setConfig({...config, excludeLocationTerms: e.target.value})}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      מיקומים להחרגה (עיר, אזור) - אחד בכל שורה. בדיקה רק מול מיקום המועמד
+                    </p>
                   </div>
                 </div>
 
