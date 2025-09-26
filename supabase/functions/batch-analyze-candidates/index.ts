@@ -46,9 +46,9 @@ interface BatchAnalysisResult {
 }
 
 // Retry configuration
-const MAX_RETRIES = 3;
-const INITIAL_DELAY = 2000; // 2 seconds
-const REQUEST_TIMEOUT = 30000; // 30 seconds
+const MAX_RETRIES = 1;
+const INITIAL_DELAY = 4000; // 4 seconds
+const REQUEST_TIMEOUT = 15000; // 15 seconds
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -257,13 +257,26 @@ Return JSON array with candidateId, passes_experience_check, passes_role_duratio
   } catch (error) {
     console.error('Error in batch-analyze-candidates function:', error);
     
-    // Return fallback analysis for client-side basic filtering
-    if (error instanceof Error && error.message.includes('OpenAI')) {
+    // Handle AbortError as immediate fallback
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Request aborted, triggering fallback');
       return new Response(
         JSON.stringify({ 
           error: 'AI_ANALYSIS_FAILED', 
           fallback: true,
-          message: 'OpenAI analysis failed, using fallback filtering' 
+          message: 'Request timeout, using fallback filtering' 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Return fallback analysis for client-side basic filtering
+    if (error instanceof Error && (error.message.includes('OpenAI') || error.message.includes('timeout'))) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'AI_ANALYSIS_FAILED', 
+          fallback: true,
+          message: 'AI analysis failed, using fallback filtering' 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

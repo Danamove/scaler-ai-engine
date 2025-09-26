@@ -328,7 +328,12 @@ const ProcessFilter = () => {
           try {
             console.log(`Processing batch ${batchNum} with ${batchCandidates.length} candidates`);
             
-            const { data: batchResults, error: batchError } = await supabase.functions.invoke(
+            // Add client-side timeout of 20 seconds
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Client timeout')), 20000)
+            );
+            
+            const invokePromise = supabase.functions.invoke(
               'batch-analyze-candidates',
               {
                 body: {
@@ -339,6 +344,11 @@ const ProcessFilter = () => {
                 }
               }
             );
+
+            const { data: batchResults, error: batchError } = await Promise.race([
+              invokePromise,
+              timeoutPromise
+            ]) as any;
 
             if (batchError) throw batchError;
             if (batchResults?.error === 'AI_ANALYSIS_FAILED') {
@@ -432,15 +442,15 @@ const ProcessFilter = () => {
               setProgress(progressPercent);
               setCurrentStep(`Stage 2: AI analysis (${processedCount}/${stage1PassedCandidates.length})...`);
               
-              // Update time estimation
+              // Update batch and time estimation
+              const newBatchesProcessed = Math.floor(processedCount / batchSize) + 1;
               const elapsed = Date.now() - startTime;
-              const rate = processedCount / elapsed;
               const remaining = stage1PassedCandidates.length - processedCount;
-              const estimatedRemaining = remaining / rate;
+              const estimatedRemaining = remaining > 0 && processedCount > 0 ? (elapsed / processedCount) * remaining : 0;
               
               setProcessState(prev => ({
                 ...prev,
-                batchesProcessed: prev.batchesProcessed + 1,
+                batchesProcessed: newBatchesProcessed,
                 estimatedTime: estimatedRemaining
               }));
               
@@ -605,18 +615,22 @@ const ProcessFilter = () => {
                       <RefreshCw className="h-4 w-4 animate-spin" />
                       {currentStep}
                     </span>
-                    {processState.estimatedTime && processState.estimatedTime > 0 && (
+                    {processState.estimatedTime && processState.estimatedTime > 0 ? (
                       <span className="text-muted-foreground">
                         ~{formatTime(processState.estimatedTime)} remaining
                       </span>
-                    )}
+                    ) : processing && processState.totalBatches > 0 ? (
+                      <span className="text-muted-foreground">
+                        Calculating...
+                      </span>
+                    ) : null}
                   </div>
                   <Progress value={progress} className="w-full" />
                   <div className="text-xs text-muted-foreground text-center">
                     {progress.toFixed(1)}% complete
                     {processState.totalBatches > 0 && (
                       <span className="ml-2">
-                        • Batch {processState.currentBatch}/{processState.totalBatches}
+                        • Batch {processState.batchesProcessed}/{processState.totalBatches}
                       </span>
                     )}
                   </div>
@@ -734,8 +748,8 @@ const ProcessFilter = () => {
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">
                   <p><strong>Parallel Processing:</strong> Up to 3 batches processed simultaneously</p>
-                  <p><strong>Larger Batches:</strong> 25-30 candidates per batch (vs 10 previously)</p>
-                  <p><strong>Faster AI Model:</strong> GPT-5-Nano for 5x faster analysis</p>
+                  <p><strong>Optimized Batches:</strong> 15 candidates per batch for stability</p>
+                  <p><strong>Stable AI Model:</strong> GPT-4o-Mini for reliable analysis</p>
                 </div>
                 <div className="space-y-2">
                   <p><strong>Retry Logic:</strong> Automatic retries with exponential backoff</p>
