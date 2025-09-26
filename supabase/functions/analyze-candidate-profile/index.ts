@@ -21,6 +21,9 @@ interface FilterRules {
   must_have_terms: string[];
   exclude_terms: string[];
   required_titles: string[];
+  expanded_must_have_terms?: string[];
+  expanded_exclude_terms?: string[];
+  expanded_required_titles?: string[];
 }
 
 interface AnalysisResult {
@@ -63,12 +66,31 @@ serve(async (req) => {
       Full Name: ${candidate.full_name || ''}
     `;
 
-    // Create synonyms context for AI
-    const synonymsContext = synonyms.length > 0 ? `
-    Available Synonyms for semantic matching:
-    ${synonyms.map((s: any) => `- ${s.canonical_term} ↔ ${s.variant_term} (${s.category})`).join('\n')}
+    // Create enhanced context for AI with expanded terms
+    const expandedTermsContext = `
+    Original Terms:
+    - Must-have: ${filterRules.must_have_terms?.join(', ') || 'none'}
+    - Exclude: ${filterRules.exclude_terms?.join(', ') || 'none'}  
+    - Required titles: ${filterRules.required_titles?.join(', ') || 'none'}
     
-    IMPORTANT: Use these synonyms when analyzing terms and titles. Consider semantic equivalents.
+    Expanded Terms (including synonyms):
+    - Must-have expanded: ${filterRules.expanded_must_have_terms?.join(', ') || 'none'}
+    - Exclude expanded: ${filterRules.expanded_exclude_terms?.join(', ') || 'none'}
+    - Required titles expanded: ${filterRules.expanded_required_titles?.join(', ') || 'none'}
+    
+    CRITICAL INSTRUCTIONS:
+    1. "engineer" and "developer" are EQUIVALENT roles
+    2. "backend" includes: back-end, server-side, api, microservices
+    3. "frontend" includes: front-end, client-side, UI
+    4. Seniority hierarchy: junior < mid < senior ≤ lead ≤ principal ≤ staff
+    5. Management terms: manager, team lead, head of, director are ALL management roles
+    6. For exclusions: if ANY management synonym is found, exclude the candidate
+    7. For titles: consider semantic equivalence and domain matches in profile summary
+    `;
+
+    const synonymsContext = synonyms.length > 0 ? `
+    Database Synonyms:
+    ${synonyms.map((s: any) => `- ${s.canonical_term} ↔ ${s.variant_term} (${s.category})`).join('\n')}
     ` : '';
 
     // Get embeddings for candidate profile
@@ -115,12 +137,25 @@ serve(async (req) => {
               "title_match_score": number
             }
             
-            Scoring guidelines:
-            - must_have_score: 0-100, how well the candidate matches required terms
-            - exclude_terms_score: 0-100, how much the candidate matches excluded terms (lower is better)
-            - title_match_score: 0-100, how well the title matches required titles
+            CRITICAL SCORING GUIDELINES:
+            - must_have_score: 0-100, semantic match to expanded required terms
+            - exclude_terms_score: 0-100, presence of expanded excluded terms (LOWER is better)  
+            - title_match_score: 0-100, title relevance considering role+domain+seniority
             
-            Base your analysis on semantic meaning, not just keyword matching.`
+            SEMANTIC EQUIVALENCES (treat as identical):
+            - engineer ≡ developer ≡ programmer ≡ coder
+            - backend ≡ back-end ≡ server-side ≡ api development
+            - frontend ≡ front-end ≡ client-side ≡ UI development  
+            - senior ≡ sr ≤ lead ≤ principal ≤ staff (seniority hierarchy)
+            
+            EXCLUSION RULES:
+            - ANY management synonym (manager, lead, head of, director) should score high on exclude_terms_score
+            - Be very sensitive to management terminology in titles and descriptions
+            
+            TITLE MATCHING:
+            - Match by role (engineer≡developer) + domain (backend≡server-side) + seniority level
+            - "Software Engineer" with backend experience should match "Senior Backend Engineer"
+            - Consider profile summary for domain/technology context`
           },
           {
             role: 'user',
@@ -128,20 +163,23 @@ serve(async (req) => {
             
             ${candidateText}
             
+            ${expandedTermsContext}
+            
+            ${synonymsContext}
+            
             Filter Requirements:
             - Minimum years experience: ${filterRules.min_years_experience}
             - Minimum months in current role: ${filterRules.min_months_current_role}
-            - Must have terms: ${filterRules.must_have_terms?.join(', ') || 'none'}
-            - Exclude terms: ${filterRules.exclude_terms?.join(', ') || 'none'}
-            - Required titles: ${filterRules.required_titles?.join(', ') || 'none'}
             
-            Provide semantic analysis considering:
-            1. Infer actual experience from role progression and description
-            2. Estimate time in current role from context clues
+            ANALYSIS TASKS:
+            1. Estimate actual experience from role progression and description
+            2. Estimate time in current role from context clues  
             3. Assess education level from degrees mentioned
-            4. Score semantic similarity to must-have terms (not just keywords)
-            5. Score presence of exclude terms (considering context)
-            6. Score title match considering role seniority and domain`
+            4. Score must-have terms match using EXPANDED terms list (consider semantic equivalence)
+            5. Score exclude terms presence using EXPANDED terms list (be strict on management terms)
+            6. Score title match using expanded titles and semantic equivalence rules
+            
+            Remember: Focus on SEMANTIC MEANING over exact keyword matching. Use the equivalence rules provided.`
           }
         ],
         max_tokens: 500,

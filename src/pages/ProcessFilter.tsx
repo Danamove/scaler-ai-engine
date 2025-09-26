@@ -160,52 +160,207 @@ const ProcessFilter = () => {
         pastCandidates: pastCandidates?.length || 0
       });
 
-      // Create synonym helper functions
-      const createSynonymMap = (categories: string[]) => {
-        const synonymMap = new Map<string, string[]>();
-        synonyms?.filter(s => categories.includes(s.category)).forEach(s => {
+      // Built-in synonym maps for better matching
+      const builtInSynonyms = {
+        titles: [
+          { canonical: 'engineer', variants: ['developer', 'dev', 'programmer', 'coder'] },
+          { canonical: 'software engineer', variants: ['software developer', 'software dev', 'application developer', 'app developer'] },
+          { canonical: 'backend engineer', variants: ['backend developer', 'server-side engineer', 'server-side developer', 'back-end engineer', 'back-end developer'] },
+          { canonical: 'frontend engineer', variants: ['frontend developer', 'front-end engineer', 'front-end developer', 'ui engineer', 'ui developer'] },
+          { canonical: 'full stack engineer', variants: ['full stack developer', 'fullstack engineer', 'fullstack developer', 'full-stack engineer', 'full-stack developer'] },
+          { canonical: 'data engineer', variants: ['data developer', 'big data engineer', 'etl engineer', 'pipeline engineer'] },
+          { canonical: 'devops engineer', variants: ['devops developer', 'infrastructure engineer', 'site reliability engineer', 'sre', 'cloud engineer'] },
+          { canonical: 'architect', variants: ['technical architect', 'solution architect', 'systems architect', 'software architect'] }
+        ],
+        domains: [
+          { canonical: 'backend', variants: ['back-end', 'back end', 'server-side', 'server side', 'api', 'microservices'] },
+          { canonical: 'frontend', variants: ['front-end', 'front end', 'client-side', 'client side', 'ui', 'user interface'] },
+          { canonical: 'full stack', variants: ['fullstack', 'full-stack', 'end-to-end'] },
+          { canonical: 'data', variants: ['big data', 'analytics', 'etl', 'data processing', 'data pipeline'] },
+          { canonical: 'cloud', variants: ['aws', 'azure', 'gcp', 'google cloud', 'cloud computing'] },
+          { canonical: 'mobile', variants: ['ios', 'android', 'react native', 'flutter', 'mobile app'] }
+        ],
+        management: [
+          { canonical: 'manager', variants: ['team lead', 'team leader', 'lead', 'head of', 'supervisor', 'mgr', 'team manager', 'engineering manager', 'technical lead', 'tech lead', 'principal', 'staff', 'director', 'vp', 'cto', 'head'] },
+          { canonical: 'senior', variants: ['sr', 'sr.', 'lead', 'principal', 'staff'] }
+        ],
+        skills: [
+          { canonical: 'javascript', variants: ['js', 'node.js', 'nodejs', 'react', 'vue', 'angular'] },
+          { canonical: 'python', variants: ['django', 'flask', 'fastapi', 'pandas', 'numpy'] },
+          { canonical: 'java', variants: ['spring', 'spring boot', 'hibernate', 'maven', 'gradle'] },
+          { canonical: 'database', variants: ['sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'db'] }
+        ]
+      };
+
+      // Create unified synonym map from both built-in and database synonyms
+      const createUnifiedSynonymMap = () => {
+        const synonymMap = new Map<string, Set<string>>();
+        
+        // Add built-in synonyms
+        Object.values(builtInSynonyms).flat().forEach(group => {
+          const allTerms = [group.canonical, ...group.variants];
+          allTerms.forEach(term => {
+            const normalized = term.toLowerCase();
+            if (!synonymMap.has(normalized)) {
+              synonymMap.set(normalized, new Set([normalized]));
+            }
+            allTerms.forEach(variant => {
+              synonymMap.get(normalized)!.add(variant.toLowerCase());
+            });
+          });
+        });
+
+        // Add database synonyms
+        synonyms?.forEach(s => {
           const canonical = s.canonical_term.toLowerCase();
           const variant = s.variant_term.toLowerCase();
           
           if (!synonymMap.has(canonical)) {
-            synonymMap.set(canonical, []);
+            synonymMap.set(canonical, new Set([canonical]));
           }
-          if (!synonymMap.get(canonical)!.includes(variant)) {
-            synonymMap.get(canonical)!.push(variant);
+          if (!synonymMap.has(variant)) {
+            synonymMap.set(variant, new Set([variant]));
           }
           
-          // Also map variant to canonical
-          if (!synonymMap.has(variant)) {
-            synonymMap.set(variant, []);
-          }
-          if (!synonymMap.get(variant)!.includes(canonical)) {
-            synonymMap.get(variant)!.push(canonical);
-          }
+          synonymMap.get(canonical)!.add(variant);
+          synonymMap.get(variant)!.add(canonical);
         });
-        return synonymMap;
+
+        // Convert Sets to Arrays for easier processing
+        const finalMap = new Map<string, string[]>();
+        synonymMap.forEach((values, key) => {
+          finalMap.set(key, Array.from(values));
+        });
+        
+        return finalMap;
       };
 
-      // Create comprehensive synonym maps for different use cases
-      const titleSynonyms = createSynonymMap(['titles', 'development_roles', 'management', 'data_roles', 'operations']);
-      const skillSynonyms = createSynonymMap(['skills', 'technologies', 'tools', 'domains']);
-      const experienceSynonyms = createSynonymMap(['experience_levels', 'experience']);
-      const companyTypeSynonyms = createSynonymMap(['company_types', 'companies']);
+      const unifiedSynonyms = createUnifiedSynonymMap();
 
-      const expandTermsWithSynonyms = (terms: string[], synonymMap: Map<string, string[]>) => {
+      // Title normalization and component extraction
+      const normalizeTitle = (title: string) => {
+        return title.toLowerCase()
+          .replace(/[^\w\s-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const extractTitleComponents = (title: string) => {
+        const normalized = normalizeTitle(title);
+        const words = normalized.split(' ');
+        
+        // Extract seniority levels
+        const seniorityLevels = ['junior', 'jr', 'mid', 'middle', 'senior', 'sr', 'lead', 'principal', 'staff', 'architect'];
+        const seniority = words.find(word => seniorityLevels.some(level => level === word || word.startsWith(level)));
+        
+        // Extract domains
+        const domains = ['backend', 'back-end', 'frontend', 'front-end', 'fullstack', 'full-stack', 'data', 'devops', 'mobile', 'cloud'];
+        const domain = words.find(word => domains.some(d => word.includes(d) || d.includes(word)));
+        
+        // Extract roles
+        const roles = ['engineer', 'developer', 'architect', 'analyst', 'scientist', 'manager'];
+        const role = words.find(word => roles.some(r => word.includes(r) || r.includes(word)));
+        
+        return { seniority, domain, role, normalized };
+      };
+
+      // Enhanced term matching with word boundaries and synonym expansion
+      const expandTermsWithSynonyms = (terms: string[]) => {
         const expandedTerms = new Set<string>();
         terms.forEach(term => {
           const lowerTerm = term.toLowerCase();
           expandedTerms.add(lowerTerm);
-          const synonyms = synonymMap.get(lowerTerm) || [];
+          const synonyms = unifiedSynonyms.get(lowerTerm) || [];
           synonyms.forEach(syn => expandedTerms.add(syn));
         });
         return Array.from(expandedTerms);
       };
 
-      const checkTermMatch = (text: string, terms: string[], synonymMap: Map<string, string[]>) => {
-        const expandedTerms = expandTermsWithSynonyms(terms, synonymMap);
+      // Deterministic exclusion check with word boundaries
+      const checkExclusionMatch = (text: string, excludeTerms: string[]) => {
+        if (!excludeTerms || excludeTerms.length === 0) return { matched: false, reason: '' };
+        
+        const expandedExcludes = expandTermsWithSynonyms(excludeTerms);
         const lowerText = text.toLowerCase();
-        return expandedTerms.some(term => lowerText.includes(term));
+        
+        for (const term of expandedExcludes) {
+          // Use word boundary regex for precise matching
+          const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+          if (regex.test(lowerText)) {
+            const originalTerm = excludeTerms.find(orig => 
+              orig.toLowerCase() === term || (unifiedSynonyms.get(orig.toLowerCase()) || []).includes(term)
+            );
+            return { 
+              matched: true, 
+              reason: `Excluded by term: "${term}" (matches "${originalTerm}")` 
+            };
+          }
+        }
+        return { matched: false, reason: '' };
+      };
+
+      // Smart title matching with seniority consideration
+      const checkTitleMatch = (candidateTitle: string, requiredTitles: string[], candidateProfile: string) => {
+        if (!requiredTitles || requiredTitles.length === 0) return { matched: true, reason: 'No title requirements' };
+        
+        const candidateComponents = extractTitleComponents(candidateTitle);
+        const profileText = `${candidateTitle} ${candidateProfile}`.toLowerCase();
+        
+        for (const reqTitle of requiredTitles) {
+          const reqComponents = extractTitleComponents(reqTitle);
+          let matches = 0;
+          const reasons = [];
+          
+          // Check role match (engineer ≡ developer)
+          if (reqComponents.role && candidateComponents.role) {
+            const roleExpanded = unifiedSynonyms.get(reqComponents.role) || [reqComponents.role];
+            const candidateRoleExpanded = unifiedSynonyms.get(candidateComponents.role) || [candidateComponents.role];
+            
+            if (roleExpanded.some(r => candidateRoleExpanded.includes(r))) {
+              matches++;
+              reasons.push(`Role match: ${candidateComponents.role} ≡ ${reqComponents.role}`);
+            }
+          }
+          
+          // Check domain match (backend, frontend, etc.)
+          if (reqComponents.domain) {
+            const domainExpanded = unifiedSynonyms.get(reqComponents.domain) || [reqComponents.domain];
+            const foundInTitle = domainExpanded.some(d => candidateComponents.normalized.includes(d));
+            const foundInProfile = domainExpanded.some(d => profileText.includes(d));
+            
+            if (foundInTitle || foundInProfile) {
+              matches++;
+              reasons.push(`Domain match: found ${reqComponents.domain} equivalent`);
+            }
+          }
+          
+          // Check seniority (senior+ should match lead/principal/staff)
+          if (reqComponents.seniority) {
+            const seniorityHierarchy = ['junior', 'jr', 'mid', 'middle', 'senior', 'sr', 'lead', 'principal', 'staff'];
+            const reqIndex = seniorityHierarchy.findIndex(s => reqComponents.seniority?.includes(s));
+            const candidateIndex = candidateComponents.seniority ? 
+              seniorityHierarchy.findIndex(s => candidateComponents.seniority?.includes(s)) : -1;
+            
+            if (candidateIndex >= reqIndex) {
+              matches++;
+              reasons.push(`Seniority match: ${candidateComponents.seniority} >= ${reqComponents.seniority}`);
+            }
+          }
+          
+          // If we have at least 2 component matches or exact title match, consider it a match
+          const exactMatch = expandTermsWithSynonyms([reqTitle]).some(term => 
+            candidateComponents.normalized.includes(term) || profileText.includes(term)
+          );
+          
+          if (matches >= 2 || exactMatch) {
+            return { 
+              matched: true, 
+              reason: `Title matched: ${reasons.join('; ')}${exactMatch ? '; Exact match found' : ''}` 
+            };
+          }
+        }
+        
+        return { matched: false, reason: 'No sufficient title component matches found' };
       };
 
       // Clear existing results for this job
@@ -289,111 +444,133 @@ const ProcessFilter = () => {
 
         if (stage1Pass) stage1Passed++;
 
-        // STAGE 2: AI-Enhanced User Rules Filtering (only if passed Stage 1)
+        // STAGE 2: Enhanced User Rules Filtering with Deterministic Pre-checks
         if (stage1Pass) {
-          try {
-            // Call AI analysis function for semantic evaluation
-            const { data: aiAnalysis, error: aiError } = await supabase.functions.invoke(
-              'analyze-candidate-profile', 
-              {
-                body: {
-                  candidate,
-                  filterRules,
-                  userId: user.id,
-                  synonyms: synonyms || []
+          // Pre-check: Deterministic exclusion filtering (before AI)
+          if (filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+            const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
+            const exclusionResult = checkExclusionMatch(profileText, filterRules.exclude_terms);
+            if (exclusionResult.matched) {
+              stage2Pass = false;
+              filterReasons.push(exclusionResult.reason);
+            }
+          }
+
+          // Pre-check: Enhanced title matching (before AI)
+          if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
+            const titleResult = checkTitleMatch(
+              candidate.current_title || '', 
+              filterRules.required_titles, 
+              candidate.profile_summary || ''
+            );
+            if (!titleResult.matched) {
+              stage2Pass = false;
+              filterReasons.push(`Title mismatch: ${titleResult.reason}`);
+            } else {
+              filterReasons.push(`Title matched: ${titleResult.reason}`);
+            }
+          }
+
+          // Only proceed with AI analysis if deterministic checks passed
+          if (stage2Pass) {
+            try {
+              // Prepare expanded terms for AI
+              const expandedMustHave = filterRules.must_have_terms ? 
+                expandTermsWithSynonyms(filterRules.must_have_terms) : [];
+              const expandedExclude = filterRules.exclude_terms ? 
+                expandTermsWithSynonyms(filterRules.exclude_terms) : [];
+              const expandedTitles = filterRules.required_titles ? 
+                expandTermsWithSynonyms(filterRules.required_titles) : [];
+
+              // Call AI analysis function for semantic evaluation
+              const { data: aiAnalysis, error: aiError } = await supabase.functions.invoke(
+                'analyze-candidate-profile', 
+                {
+                  body: {
+                    candidate,
+                    filterRules: {
+                      ...filterRules,
+                      expanded_must_have_terms: expandedMustHave,
+                      expanded_exclude_terms: expandedExclude,
+                      expanded_required_titles: expandedTitles
+                    },
+                    userId: user.id,
+                    synonyms: synonyms || []
+                  }
+                }
+              );
+
+              if (aiError) {
+                console.error('AI Analysis error:', aiError);
+                // Fallback to basic experience/duration checks only
+                // (exclusion and title checks already done deterministically)
+                
+                // Enhanced experience check
+                const experienceFromProfile = candidate.years_of_experience || 0;
+                if (experienceFromProfile < filterRules.min_years_experience) {
+                  stage2Pass = false;
+                  filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
+                }
+
+                // Enhanced role duration check
+                if (stage2Pass) {
+                  const currentRoleDuration = candidate.months_in_current_role || 0;
+                  if (currentRoleDuration < filterRules.min_months_current_role) {
+                    stage2Pass = false;
+                    filterReasons.push(`Insufficient role duration: ${currentRoleDuration} months (required: ${filterRules.min_months_current_role})`);
+                  }
+                }
+
+                // Must-have terms check with synonyms (only if still passing)
+                if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+                  const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
+                  const expandedMustHave = expandTermsWithSynonyms(filterRules.must_have_terms);
+                  const hasRequiredTerms = expandedMustHave.some(term => profileText.toLowerCase().includes(term));
+                  
+                  if (!hasRequiredTerms) {
+                    stage2Pass = false;
+                    filterReasons.push('Missing required terms (fallback check)');
+                  }
+                }
+
+              } else if (aiAnalysis) {
+                // Use AI analysis results, but override with deterministic results if conflicting
+                console.log(`AI Analysis for ${candidate.full_name}:`, aiAnalysis);
+                
+                // Apply AI results for experience and duration only
+                // (exclusion and title already checked deterministically)
+                const aiPasses = (
+                  aiAnalysis.passes_experience_check &&
+                  aiAnalysis.passes_role_duration_check &&
+                  aiAnalysis.passes_must_have_check
+                );
+
+                if (!aiPasses) {
+                  stage2Pass = false;
+                }
+
+                // Add detailed AI-based reasons
+                if (!aiAnalysis.passes_experience_check) {
+                  filterReasons.push(`Insufficient experience: AI estimated ${aiAnalysis.estimated_years_experience || 'unknown'} years (required: ${filterRules.min_years_experience})`);
+                }
+                if (!aiAnalysis.passes_role_duration_check) {
+                  filterReasons.push(`Insufficient role duration: AI estimated ${aiAnalysis.estimated_months_in_role || 'unknown'} months (required: ${filterRules.min_months_current_role})`);
+                }
+                if (!aiAnalysis.passes_must_have_check) {
+                  filterReasons.push(`Low must-have terms match: AI score ${aiAnalysis.must_have_score || 0}% (required: 70%)`);
                 }
               }
-            );
-
-            if (aiError) {
-              console.error('AI Analysis error:', aiError);
-              // Fallback to enhanced basic filtering with synonyms
-              stage2Pass = true;
-              
-              // Enhanced experience check
+            } catch (aiCallError) {
+              console.error('Failed to call AI analysis:', aiCallError);
+              // Continue with basic checks as fallback
               const experienceFromProfile = candidate.years_of_experience || 0;
               if (experienceFromProfile < filterRules.min_years_experience) {
                 stage2Pass = false;
                 filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
               }
-
-              // Enhanced role duration check
-              if (stage2Pass) {
-                const currentRoleDuration = candidate.months_in_current_role || 0;
-                if (currentRoleDuration < filterRules.min_months_current_role) {
-                  stage2Pass = false;
-                  filterReasons.push(`Insufficient role duration: ${currentRoleDuration} months (required: ${filterRules.min_months_current_role})`);
-                }
-              }
-
-              // Enhanced exclude terms check with synonyms
-              if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-                const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
-                if (checkTermMatch(profileText, filterRules.exclude_terms, skillSynonyms)) {
-                  stage2Pass = false;
-                  filterReasons.push('Contains excluded terms');
-                }
-              }
-
-              // Enhanced must have terms check with synonyms
-              if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-                const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
-                if (!checkTermMatch(profileText, filterRules.must_have_terms, skillSynonyms)) {
-                  stage2Pass = false;
-                  filterReasons.push('Missing required terms');
-                }
-              }
-
-              // Enhanced required titles check with synonyms
-              if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
-                const currentTitle = candidate.current_title || '';
-                if (!checkTermMatch(currentTitle, filterRules.required_titles, titleSynonyms)) {
-                  stage2Pass = false;
-                  filterReasons.push('Title not in required list');
-                }
-              }
-
-            } else if (aiAnalysis) {
-              // Use AI analysis results
-              console.log(`AI Analysis for ${candidate.full_name}:`, aiAnalysis);
-              
-              stage2Pass = (
-                aiAnalysis.passes_experience_check &&
-                aiAnalysis.passes_role_duration_check &&
-                aiAnalysis.passes_must_have_check &&
-                aiAnalysis.passes_exclude_check &&
-                aiAnalysis.passes_title_check
-              );
-
-              // Add detailed AI-based reasons with actual values
-              if (!aiAnalysis.passes_experience_check) {
-                filterReasons.push(`Insufficient experience: AI estimated ${aiAnalysis.estimated_years_experience || 'unknown'} years (required: ${filterRules.min_years_experience})`);
-              }
-              if (!aiAnalysis.passes_role_duration_check) {
-                filterReasons.push(`Insufficient role duration: AI estimated ${aiAnalysis.estimated_months_in_role || 'unknown'} months (required: ${filterRules.min_months_current_role})`);
-              }
-              if (!aiAnalysis.passes_must_have_check) {
-                filterReasons.push(`Low must-have terms match: AI score ${aiAnalysis.must_have_score || 0}% (required: 70%)`);
-              }
-              if (!aiAnalysis.passes_exclude_check) {
-                filterReasons.push(`High exclude terms match: AI score ${aiAnalysis.exclude_terms_score || 0}% (max: 30%)`);
-              }
-              if (!aiAnalysis.passes_title_check) {
-                filterReasons.push(`Poor title match: AI score ${aiAnalysis.title_match_score || 0}% (required: 60%)`);
-              }
-            }
-
-          } catch (aiCallError) {
-            console.error('Failed to call AI analysis:', aiCallError);
-            // Continue with enhanced basic filtering as fallback
-            stage2Pass = true;
-            
-            const experienceFromProfile = candidate.years_of_experience || 0;
-            if (experienceFromProfile < filterRules.min_years_experience) {
-              stage2Pass = false;
-              filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
             }
           }
+
 
           // Check top university requirement (enhanced matching)
           if (stage2Pass && filterRules.require_top_uni) {

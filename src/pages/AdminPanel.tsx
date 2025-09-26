@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck } from 'lucide-react';
+import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
@@ -292,6 +292,95 @@ const AdminPanel = () => {
     }
   };
 
+  // Seed recommended synonyms
+  const seedRecommendedSynonyms = async () => {
+    const recommendedSynonyms = [
+      // Core role synonyms
+      { canonical_term: 'engineer', variant_term: 'developer', category: 'title' },
+      { canonical_term: 'engineer', variant_term: 'programmer', category: 'title' },
+      { canonical_term: 'software engineer', variant_term: 'software developer', category: 'title' },
+      { canonical_term: 'software engineer', variant_term: 'application developer', category: 'title' },
+      
+      // Backend synonyms
+      { canonical_term: 'backend', variant_term: 'back-end', category: 'title' },
+      { canonical_term: 'backend', variant_term: 'server-side', category: 'title' },
+      { canonical_term: 'backend engineer', variant_term: 'backend developer', category: 'title' },
+      { canonical_term: 'backend engineer', variant_term: 'server-side engineer', category: 'title' },
+      
+      // Frontend synonyms
+      { canonical_term: 'frontend', variant_term: 'front-end', category: 'title' },
+      { canonical_term: 'frontend', variant_term: 'client-side', category: 'title' },
+      { canonical_term: 'frontend engineer', variant_term: 'frontend developer', category: 'title' },
+      { canonical_term: 'frontend engineer', variant_term: 'ui developer', category: 'title' },
+      
+      // Full stack synonyms
+      { canonical_term: 'full stack', variant_term: 'fullstack', category: 'title' },
+      { canonical_term: 'full stack', variant_term: 'full-stack', category: 'title' },
+      { canonical_term: 'full stack engineer', variant_term: 'fullstack developer', category: 'title' },
+      
+      // Management synonyms - CRITICAL for exclusions
+      { canonical_term: 'manager', variant_term: 'team lead', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'team leader', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'lead', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'head of', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'supervisor', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'team manager', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'engineering manager', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'technical lead', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'tech lead', category: 'title' },
+      { canonical_term: 'manager', variant_term: 'director', category: 'title' },
+      
+      // Seniority synonyms
+      { canonical_term: 'senior', variant_term: 'sr', category: 'title' },
+      { canonical_term: 'senior', variant_term: 'sr.', category: 'title' },
+      
+      // Technology synonyms
+      { canonical_term: 'javascript', variant_term: 'js', category: 'skill' },
+      { canonical_term: 'javascript', variant_term: 'node.js', category: 'skill' },
+      { canonical_term: 'database', variant_term: 'sql', category: 'skill' },
+      { canonical_term: 'database', variant_term: 'db', category: 'skill' }
+    ];
+
+    try {
+      let successCount = 0;
+      let duplicateCount = 0;
+
+      for (const synonym of recommendedSynonyms) {
+        try {
+          const { error } = await supabase
+            .from('synonyms')
+            .insert([synonym]);
+
+          if (error) {
+            if (error.code === '23505') { // Unique constraint violation
+              duplicateCount++;
+            } else {
+              console.error('Error inserting synonym:', error);
+            }
+          } else {
+            successCount++;
+          }
+        } catch (insertError) {
+          console.error('Failed to insert synonym:', insertError);
+        }
+      }
+
+      await loadAllData(); // Refresh the data
+
+      toast({
+        title: "Synonyms seeded",
+        description: `Added ${successCount} new synonyms. ${duplicateCount} duplicates skipped.`,
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error seeding synonyms",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -474,13 +563,21 @@ const AdminPanel = () => {
           <TabsContent value="synonyms" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Synonyms Management
-                </CardTitle>
-                <CardDescription>
-                  Manage synonym mappings for better matching in filtering
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Synonyms Management
+                    </CardTitle>
+                    <CardDescription>
+                      Manage synonym mappings for better matching in filtering
+                    </CardDescription>
+                  </div>
+                  <Button onClick={seedRecommendedSynonyms} variant="outline" className="shrink-0">
+                    <Zap className="h-4 w-4 mr-2" />
+                    Quick Seed Recommended
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
