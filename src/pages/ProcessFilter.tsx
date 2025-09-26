@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useActiveJob } from '@/hooks/useActiveJob';
 
 interface ProcessStats {
   totalCandidates: number;
@@ -23,6 +24,7 @@ const ProcessFilter = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { activeJob, loading: activeJobLoading } = useActiveJob();
   
   const [processing, setProcessing] = useState(false);
   const [stats, setStats] = useState<ProcessStats>({
@@ -39,20 +41,23 @@ const ProcessFilter = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
-    } else if (user) {
+    } else if (!activeJobLoading && !activeJob) {
+      navigate('/dashboard');
+    } else if (user && activeJob) {
       loadInitialStats();
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, activeJob, activeJobLoading, navigate]);
 
   const loadInitialStats = async () => {
-    if (!user) return;
+    if (!user || !activeJob) return;
 
     try {
-      // Get total candidates
+      // Get total candidates for the active job
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', activeJob.jobId);
 
       setStats(prev => ({ ...prev, totalCandidates: totalCandidates || 0 }));
     } catch (error) {
@@ -61,7 +66,7 @@ const ProcessFilter = () => {
   };
 
   const processFiltering = async () => {
-    if (!user || processing) return;
+    if (!user || !activeJob || processing) return;
 
     console.log('Starting filtering process...');
     setProcessing(true);
@@ -86,6 +91,7 @@ const ProcessFilter = () => {
           .from('raw_data')
           .select('*')
           .eq('user_id', getActiveUserId())
+          .eq('job_id', activeJob.jobId)
           .range(offset, offset + pageSize - 1);
 
         if (candidatesError) {
@@ -108,6 +114,7 @@ const ProcessFilter = () => {
         .from('filter_rules')
         .select('*')
         .eq('user_id', getActiveUserId())
+        .eq('job_id', activeJob.jobId)
         .order('updated_at', { ascending: false })
         .limit(1);
 
