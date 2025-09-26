@@ -67,6 +67,7 @@ const ProcessFilter = () => {
     setProcessing(true);
     setProgress(0);
     setCurrentStep('Initializing...');
+    setCompleted(false);
 
     try {
       // Get candidates and filter rules
@@ -84,7 +85,7 @@ const ProcessFilter = () => {
         const { data: candidatesPage, error: candidatesError } = await supabase
           .from('raw_data')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', getActiveUserId())
           .range(offset, offset + pageSize - 1);
 
         if (candidatesError) {
@@ -106,7 +107,7 @@ const ProcessFilter = () => {
       const { data: filterRulesArray, error: filterRulesError } = await supabase
         .from('filter_rules')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', getActiveUserId())
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -143,13 +144,13 @@ const ProcessFilter = () => {
       const { data: blacklistCompanies } = await supabase
         .from('user_blacklist')
         .select('company_name')
-        .eq('user_id', user.id)
+        .eq('user_id', getActiveUserId())
         .eq('job_id', filterRules.job_id);
 
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
-        .eq('user_id', user.id)
+        .eq('user_id', getActiveUserId())
         .eq('job_id', filterRules.job_id);
 
       console.log('Loaded lists:', {
@@ -367,14 +368,14 @@ const ProcessFilter = () => {
       const { error: deleteError } = await supabase
         .from('filtered_results')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', getActiveUserId())
         .eq('job_id', filterRules.job_id);
 
       if (deleteError) {
         console.error('Error clearing previous results:', deleteError);
       }
 
-      setCurrentStep('Processing candidates...');
+      setCurrentStep('Stage 1: Deterministic filtering...');
       setProgress(30);
 
       let stage1Passed = 0;
@@ -382,18 +383,16 @@ const ProcessFilter = () => {
       let finalResults = 0;
 
       const results = [];
+      const stage1PassedCandidates = [];
 
-      console.log('Starting candidate processing...');
+      console.log('Starting Stage 1 deterministic filtering...');
 
-      // Process each candidate
+      // STAGE 1: Process all candidates through deterministic filters first
       for (let i = 0; i < candidates.length; i++) {
         const candidate = candidates[i];
         let stage1Pass = true;
-        let stage2Pass = false;
         const filterReasons = [];
 
-        // STAGE 1: Company & Lists Filtering - Check in specific order to get accurate reasons
-        
         // Check blacklist first (current company only)
         const blacklist = blacklistCompanies?.map(b => b.company_name.toLowerCase()) || [];
         if (candidate.current_company && blacklist.includes(candidate.current_company.toLowerCase())) {
@@ -442,262 +441,212 @@ const ProcessFilter = () => {
           }
         }
 
-        if (stage1Pass) stage1Passed++;
-
-        // STAGE 2: Enhanced User Rules Filtering with Deterministic Pre-checks
         if (stage1Pass) {
-          // Pre-check: Deterministic exclusion filtering (before AI)
-          if (filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-            const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
-            const exclusionResult = checkExclusionMatch(profileText, filterRules.exclude_terms);
-            if (exclusionResult.matched) {
-              stage2Pass = false;
-              filterReasons.push(exclusionResult.reason);
-            }
-          }
+          stage1Passed++;
+          stage1PassedCandidates.push({
+            candidate,
+            filterReasons: [...filterReasons]
+          });
+        } else {
+          // Save failed Stage 1 result
+          results.push({
+            raw_data_id: candidate.id,
+            user_id: getActiveUserId(),
+            job_id: filterRules.job_id,
+            stage_1_passed: false,
+            stage_2_passed: false,
+            filter_reasons: filterReasons
+          });
+        }
 
-          // Pre-check: Enhanced title matching (before AI)
-          if (stage2Pass && filterRules.required_titles && filterRules.required_titles.length > 0) {
-            const titleResult = checkTitleMatch(
-              candidate.current_title || '', 
-              filterRules.required_titles, 
-              candidate.profile_summary || ''
+        // Update progress for Stage 1
+        const stage1Progress = Math.floor(30 + (i + 1) / candidates.length * 20);
+        setProgress(stage1Progress);
+        setStats(prev => ({ 
+          ...prev, 
+          processed: i + 1,
+          stage1Passed: stage1Passed
+        }));
+      }
+
+      console.log(`Stage 1 complete: ${stage1PassedCandidates.length} candidates passed out of ${candidates.length}`);
+
+      // STAGE 2: Batch AI Processing for candidates who passed Stage 1
+      if (stage1PassedCandidates.length > 0) {
+        setCurrentStep('Stage 2: AI analysis (batch processing)...');
+        setProgress(50);
+
+        const batchSize = 10; // Process in batches to avoid timeout
+        const batches = [];
+        for (let i = 0; i < stage1PassedCandidates.length; i += batchSize) {
+          batches.push(stage1PassedCandidates.slice(i, i + batchSize));
+        }
+
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batch = batches[batchIndex];
+          const batchCandidates = batch.map(item => item.candidate);
+          
+          console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${batchCandidates.length} candidates`);
+          
+          try {
+            // Call batch analysis function
+            const { data: batchResults, error: batchError } = await supabase.functions.invoke(
+              'batch-analyze-candidates',
+              {
+                body: {
+                  candidates: batchCandidates,
+                  filterRules,
+                  userId: getActiveUserId(),
+                  synonyms: synonyms || []
+                }
+              }
             );
-            if (!titleResult.matched) {
-              stage2Pass = false;
-              filterReasons.push(`Title mismatch: ${titleResult.reason}`);
-            } else {
-              filterReasons.push(`Title matched: ${titleResult.reason}`);
-            }
-          }
 
-          // Only proceed with AI analysis if deterministic checks passed
-          if (stage2Pass) {
-            try {
-              // Prepare expanded terms for AI
-              const expandedMustHave = filterRules.must_have_terms ? 
-                expandTermsWithSynonyms(filterRules.must_have_terms) : [];
-              const expandedExclude = filterRules.exclude_terms ? 
-                expandTermsWithSynonyms(filterRules.exclude_terms) : [];
-              const expandedTitles = filterRules.required_titles ? 
-                expandTermsWithSynonyms(filterRules.required_titles) : [];
+            if (batchError) {
+              console.error('Batch AI Analysis error:', batchError);
+              // Fallback to basic checks for this batch
+              batch.forEach(item => {
+                const candidate = item.candidate;
+                const filterReasons = [...item.filterReasons];
+                let stage2Pass = true;
 
-              // Call AI analysis function for semantic evaluation
-              const { data: aiAnalysis, error: aiError } = await supabase.functions.invoke(
-                'analyze-candidate-profile', 
-                {
-                  body: {
-                    candidate,
-                    filterRules: {
-                      ...filterRules,
-                      expanded_must_have_terms: expandedMustHave,
-                      expanded_exclude_terms: expandedExclude,
-                      expanded_required_titles: expandedTitles
-                    },
-                    userId: user.id,
-                    synonyms: synonyms || []
-                  }
-                }
-              );
-
-              if (aiError) {
-                console.error('AI Analysis error:', aiError);
-                // Fallback to basic experience/duration checks only
-                // (exclusion and title checks already done deterministically)
-                
-                // Enhanced experience check
-                const experienceFromProfile = candidate.years_of_experience || 0;
-                if (experienceFromProfile < filterRules.min_years_experience) {
+                // Basic experience check
+                if (candidate.years_of_experience < filterRules.min_years_experience) {
                   stage2Pass = false;
-                  filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
+                  filterReasons.push(`Insufficient experience: ${candidate.years_of_experience} years`);
                 }
 
-                // Enhanced role duration check
-                if (stage2Pass) {
-                  const currentRoleDuration = candidate.months_in_current_role || 0;
-                  if (currentRoleDuration < filterRules.min_months_current_role) {
-                    stage2Pass = false;
-                    filterReasons.push(`Insufficient role duration: ${currentRoleDuration} months (required: ${filterRules.min_months_current_role})`);
-                  }
-                }
-
-                // Must-have terms check with synonyms (only if still passing)
-                if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-                  const profileText = `${candidate.current_title || ''} ${candidate.profile_summary || ''}`;
-                  const expandedMustHave = expandTermsWithSynonyms(filterRules.must_have_terms);
-                  const hasRequiredTerms = expandedMustHave.some(term => profileText.toLowerCase().includes(term));
-                  
-                  if (!hasRequiredTerms) {
-                    stage2Pass = false;
-                    filterReasons.push('Missing required terms (fallback check)');
-                  }
-                }
-
-              } else if (aiAnalysis) {
-                // Use AI analysis results, but override with deterministic results if conflicting
-                console.log(`AI Analysis for ${candidate.full_name}:`, aiAnalysis);
-                
-                // Apply AI results for experience and duration only
-                // (exclusion and title already checked deterministically)
-                const aiPasses = (
-                  aiAnalysis.passes_experience_check &&
-                  aiAnalysis.passes_role_duration_check &&
-                  aiAnalysis.passes_must_have_check
-                );
-
-                if (!aiPasses) {
+                // Basic role duration check
+                if (stage2Pass && candidate.months_in_current_role < filterRules.min_months_current_role) {
                   stage2Pass = false;
+                  filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role} months`);
                 }
 
-                // Add detailed AI-based reasons
-                if (!aiAnalysis.passes_experience_check) {
-                  filterReasons.push(`Insufficient experience: AI estimated ${aiAnalysis.estimated_years_experience || 'unknown'} years (required: ${filterRules.min_years_experience})`);
-                }
-                if (!aiAnalysis.passes_role_duration_check) {
-                  filterReasons.push(`Insufficient role duration: AI estimated ${aiAnalysis.estimated_months_in_role || 'unknown'} months (required: ${filterRules.min_months_current_role})`);
-                }
-                if (!aiAnalysis.passes_must_have_check) {
-                  filterReasons.push(`Low must-have terms match: AI score ${aiAnalysis.must_have_score || 0}% (required: 70%)`);
-                }
-              }
-            } catch (aiCallError) {
-              console.error('Failed to call AI analysis:', aiCallError);
-              // Continue with basic checks as fallback
-              const experienceFromProfile = candidate.years_of_experience || 0;
-              if (experienceFromProfile < filterRules.min_years_experience) {
-                stage2Pass = false;
-                filterReasons.push(`Insufficient experience: ${experienceFromProfile} years (required: ${filterRules.min_years_experience})`);
-              }
-            }
-          }
-
-
-          // Check top university requirement (enhanced matching)
-          if (stage2Pass && filterRules.require_top_uni) {
-            const { data: topUniversities } = await supabase
-              .from('top_universities')
-              .select('university_name');
-
-            const topUniList = topUniversities?.map(u => u.university_name.toLowerCase()) || [];
-            const candidateEducation = candidate.education?.toLowerCase() || '';
-            
-            // Enhanced university matching with partial names, abbreviations, and word boundaries
-            const checkUniversityMatch = (education: string, universityList: string[]) => {
-              if (!education.trim()) return false;
-              
-              return universityList.some(uni => {
-                // Direct substring match
-                if (education.includes(uni) || uni.includes(education)) {
-                  return true;
-                }
+                if (stage2Pass) stage2Passed++;
                 
-                // Check key words from university name (handle abbreviations and partial names)
-                const uniWords = uni.split(/[\s\-–—]+/).filter(w => w.length > 2 && !['of', 'the', 'for', 'and', 'in'].includes(w));
-                const eduWords = education.split(/[\s\-–—,\.()]+/).filter(w => w.length > 2);
-                
-                // If we have significant word overlap (at least 2 key words or institution name match)
-                const matches = uniWords.filter(uw => 
-                  eduWords.some(ew => ew.includes(uw) || uw.includes(ew))
-                );
-                
-                if (matches.length >= Math.min(2, uniWords.length)) {
-                  return true;
-                }
-                
-                // Handle common abbreviations and short names
-                const commonAbbreviations = {
-                  'mit': 'massachusetts institute of technology',
-                  'caltech': 'california institute of technology',
-                  'technion': 'israel institute of technology',
-                  'tau': 'tel aviv university',
-                  'huji': 'hebrew university',
-                  'bgu': 'ben-gurion university',
-                  'ubc': 'university of british columbia',
-                  'mcgill': 'mcgill university',
-                  'eth': 'eth zürich'
-                };
-                
-                // Check if education contains known abbreviations
-                for (const [abbrev, fullName] of Object.entries(commonAbbreviations)) {
-                  if ((education.includes(abbrev) && uni.includes(fullName)) ||
-                      (uni.includes(abbrev) && education.includes(fullName))) {
-                    return true;
-                  }
-                }
-                
-                return false;
+                results.push({
+                  raw_data_id: candidate.id,
+                  user_id: getActiveUserId(),
+                  job_id: filterRules.job_id,
+                  stage_1_passed: true,
+                  stage_2_passed: stage2Pass,
+                  filter_reasons: filterReasons
+                });
               });
-            };
-            
-            const hasTopUni = checkUniversityMatch(candidateEducation, topUniList);
-            if (!hasTopUni) {
-              stage2Pass = false;
-              filterReasons.push('Education not from recognized top university');
-            } else {
-              filterReasons.push('Top university requirement met');
+            } else if (batchResults?.results) {
+              // Process batch AI results
+              batchResults.results.forEach((aiResult: any, index: number) => {
+                const batchItem = batch[index];
+                const candidate = batchItem.candidate;
+                const filterReasons = [...batchItem.filterReasons];
+                
+                const stage2Pass = aiResult.overall_pass;
+                
+                if (!stage2Pass) {
+                  if (!aiResult.passes_experience_check) {
+                    filterReasons.push(`Insufficient experience (AI analysis)`);
+                  }
+                  if (!aiResult.passes_role_duration_check) {
+                    filterReasons.push(`Insufficient role duration (AI analysis)`);
+                  }
+                  if (!aiResult.passes_must_have_terms_check) {
+                    filterReasons.push(`Missing required terms (AI analysis)`);
+                  }
+                  if (aiResult.passes_top_university_check === false) {
+                    filterReasons.push(`Not from top university`);
+                  }
+                }
+                
+                if (stage2Pass) stage2Passed++;
+                
+                results.push({
+                  raw_data_id: candidate.id,
+                  user_id: getActiveUserId(),
+                  job_id: filterRules.job_id,
+                  stage_1_passed: true,
+                  stage_2_passed: stage2Pass,
+                  filter_reasons: filterReasons
+                });
+              });
             }
+            
+          } catch (batchError) {
+            console.error('Failed to process batch:', batchError);
+            // Fallback processing for failed batch
+            batch.forEach(item => {
+              const candidate = item.candidate;
+              const filterReasons = [...item.filterReasons, 'AI analysis failed - basic check applied'];
+              
+              let stage2Pass = true;
+              if (candidate.years_of_experience < filterRules.min_years_experience) {
+                stage2Pass = false;
+                filterReasons.push(`Insufficient experience: ${candidate.years_of_experience} years`);
+              }
+
+              if (stage2Pass) stage2Passed++;
+              
+              results.push({
+                raw_data_id: candidate.id,
+                user_id: getActiveUserId(),
+                job_id: filterRules.job_id,
+                stage_1_passed: true,
+                stage_2_passed: stage2Pass,
+                filter_reasons: filterReasons
+              });
+            });
           }
 
-          if (stage2Pass) stage2Passed++;
-        }
-
-        if (stage1Pass && stage2Pass) finalResults++;
-
-        // Create result record
-        results.push({
-          user_id: user.id,
-          job_id: filterRules.job_id,
-          raw_data_id: candidate.id,
-          stage_1_passed: stage1Pass,
-          stage_2_passed: stage2Pass,
-          filter_reasons: filterReasons
-        });
-
-        // Update progress every 100 candidates
-        if (i % 100 === 0 || i === candidates.length - 1) {
-          const progressPercent = 30 + ((i + 1) / candidates.length) * 60;
-          setProgress(progressPercent);
-          setStats(prev => ({
-            ...prev,
-            processed: i + 1,
-            stage1Passed,
-            stage2Passed,
-            finalResults
+          // Update progress for each batch
+          const batchProgress = Math.floor(50 + ((batchIndex + 1) / batches.length) * 30);
+          setProgress(batchProgress);
+          setStats(prev => ({ 
+            ...prev, 
+            stage2Passed: stage2Passed,
+            finalResults: stage2Passed
           }));
-          console.log(`Processed ${i + 1}/${candidates.length} candidates. Stage1: ${stage1Passed}, Stage2: ${stage2Passed}, Final: ${finalResults}`);
         }
       }
 
-      // Save results to database
-      console.log('Saving results to database...');
+      // Save all results to database
       setCurrentStep('Saving results...');
-      setProgress(95);
+      setProgress(80);
 
-      const { error } = await supabase
-        .from('filtered_results')
-        .insert(results);
+      if (results.length > 0) {
+        const { error: insertError } = await supabase
+          .from('filtered_results')
+          .insert(results);
 
-      if (error) {
-        console.error('Error saving results:', error);
-        throw error;
+        if (insertError) {
+          console.error('Error saving results:', insertError);
+          throw insertError;
+        }
       }
 
+      // Final update
+      setStats(prev => ({
+        ...prev,
+        processed: candidates.length,
+        stage1Passed,
+        stage2Passed,
+        finalResults
+      }));
       setProgress(100);
-      setCurrentStep('Completed!');
+      setCurrentStep('Complete!');
       setCompleted(true);
 
-      console.log(`Filtering completed! Final stats: Stage1: ${stage1Passed}, Stage2: ${stage2Passed}, Final: ${finalResults}`);
+      console.log('Filtering completed successfully!');
+      console.log(`Final results: ${finalResults} candidates passed all stages out of ${candidates.length} total`);
 
       toast({
         title: "Filtering Complete!",
-        description: `Processed ${candidates.length} candidates. ${finalResults} final results.`,
+        description: `Processed ${candidates.length} candidates. ${finalResults} candidates passed all filters.`,
       });
 
-    } catch (error: any) {
-      console.error('Processing error:', error);
+    } catch (error) {
+      console.error('Processing failed:', error);
       toast({
-        title: "Processing Error",
-        description: error.message || "Failed to process filtering.",
+        title: "Processing Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     } finally {
