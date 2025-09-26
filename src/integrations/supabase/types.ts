@@ -450,36 +450,14 @@ export type Database = {
       }
     }
     Views: {
-      profiles_safe: {
-        Row: {
-          created_at: string | null
-          full_name: string | null
-          id: string | null
-          role: Database["public"]["Enums"]["user_role"] | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          role?: Database["public"]["Enums"]["user_role"] | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          role?: Database["public"]["Enums"]["user_role"] | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       can_access_own_profile: {
+        Args: { profile_user_id: string }
+        Returns: boolean
+      }
+      can_access_profile: {
         Args: { profile_user_id: string }
         Returns: boolean
       }
