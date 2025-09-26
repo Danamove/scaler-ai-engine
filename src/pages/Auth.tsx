@@ -30,12 +30,26 @@ const Auth = () => {
   const [resetSuccess, setResetSuccess] = useState(false);
   const navigate = useNavigate();
 
+  // Password recovery state
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
       navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  // Detect Supabase recovery redirect
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+    if (params.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+    }
+  }, []);
 
   const validateForm = () => {
     try {
@@ -126,6 +140,42 @@ const Auth = () => {
     }
   };
 
+  const clearRecoveryHash = () => {
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setErrors({ password: 'Password must be at least 6 characters' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrors({ confirm: 'Passwords do not match' });
+      return;
+    }
+    setIsResetting(true);
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        setErrors({ general: error.message });
+      } else {
+        setErrors({});
+        setResetSuccess(true);
+        clearRecoveryHash();
+        setIsRecoveryMode(false);
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      setErrors({ general: 'Failed to update password' });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -156,130 +206,192 @@ const Auth = () => {
 
           <Card className="card-shadow">
             <CardHeader>
-              <Tabs value={isSignUp ? 'signup' : 'signin'} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger 
-                    value="signin" 
-                    onClick={() => setIsSignUp(false)}
-                  >
-                    Sign In
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="signup" 
-                    onClick={() => setIsSignUp(true)}
-                  >
-                    Sign Up
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {isRecoveryMode ? (
+                <>
+                  <CardTitle>Reset your password</CardTitle>
+                  <CardDescription>Enter a new password to continue</CardDescription>
+                </>
+              ) : (
+                <Tabs value={isSignUp ? 'signup' : 'signin'} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger 
+                      value="signin" 
+                      onClick={() => setIsSignUp(false)}
+                    >
+                      Sign In
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="signup" 
+                      onClick={() => setIsSignUp(true)}
+                    >
+                      Sign Up
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {isSignUp && (
+              {isRecoveryMode ? (
+                <form onSubmit={handlePasswordUpdate} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
+                    <Label htmlFor="newPassword">New Password</Label>
                     <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={formData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
-                      disabled={loading}
+                      id="newPassword"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={isResetting}
                     />
-                    {errors.fullName && (
-                      <p className="text-sm text-destructive">{errors.fullName}</p>
+                    {errors.password && (
+                      <p className="text-sm text-destructive">{errors.password}</p>
                     )}
                   </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    disabled={loading}
-                  />
-                  {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Re-enter new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isResetting}
+                    />
+                    {errors.confirm && (
+                      <p className="text-sm text-destructive">{errors.confirm}</p>
+                    )}
+                  </div>
+                  {errors.general && (
+                    <p className="text-sm text-destructive text-center">{errors.general}</p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    disabled={loading}
-                  />
-                  {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password}</p>
-                  )}
-                </div>
-
-                {errors.general && (
-                  <p className="text-sm text-destructive text-center">{errors.general}</p>
-                )}
-
-                {resetSuccess && (
-                  <p className="text-sm text-green-600 text-center">
-                    Password reset email sent! Check your inbox.
-                  </p>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={loading || isResetting}
-                  variant="hero"
-                >
-                  {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
-                </Button>
-
-                {!isSignUp && (
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isResetting}
+                    variant="hero"
+                  >
+                    {isResetting ? 'Updating...' : 'Update Password'}
+                  </Button>
                   <Button 
                     type="button"
                     variant="ghost" 
                     size="sm"
                     className="w-full text-sm"
-                    onClick={handlePasswordReset}
-                    disabled={isResetting || loading}
+                    onClick={() => { setIsRecoveryMode(false); clearRecoveryHash(); }}
                   >
-                    {isResetting ? 'Sending...' : 'Forgot Password?'}
+                    Back to Sign In
                   </Button>
-                )}
-              </form>
+                </form>
+              ) : (
+                <>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {isSignUp && (
+                      <div className="space-y-2">
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input
+                          id="fullName"
+                          type="text"
+                          placeholder="Enter your full name"
+                          value={formData.fullName}
+                          onChange={(e) => handleInputChange('fullName', e.target.value)}
+                          disabled={loading}
+                        />
+                        {errors.fullName && (
+                          <p className="text-sm text-destructive">{errors.fullName}</p>
+                        )}
+                      </div>
+                    )}
 
-              <div className="mt-6 text-center text-sm text-muted-foreground">
-                {isSignUp ? (
-                  <>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setIsSignUp(false)}
-                      className="text-primary hover:underline"
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        disabled={loading}
+                      />
+                      {errors.email && (
+                        <p className="text-sm text-destructive">{errors.email}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Enter your password"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        disabled={loading}
+                      />
+                      {errors.password && (
+                        <p className="text-sm text-destructive">{errors.password}</p>
+                      )}
+                    </div>
+
+                    {errors.general && (
+                      <p className="text-sm text-destructive text-center">{errors.general}</p>
+                    )}
+
+                    {resetSuccess && (
+                      <p className="text-sm text-green-600 text-center">
+                        Password reset email sent! Check your inbox.
+                      </p>
+                    )}
+
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={loading || isResetting}
+                      variant="hero"
                     >
-                      Sign in here
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Don't have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setIsSignUp(true)}
-                      className="text-primary hover:underline"
-                    >
-                      Sign up here
-                    </button>
-                  </>
-                )}
-              </div>
+                      {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                    </Button>
+
+                    {!isSignUp && (
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="sm"
+                        className="w-full text-sm"
+                        onClick={handlePasswordReset}
+                        disabled={isResetting || loading}
+                      >
+                        {isResetting ? 'Sending...' : 'Forgot Password?'}
+                      </Button>
+                    )}
+                  </form>
+
+                  <div className="mt-6 text-center text-sm text-muted-foreground">
+                    {isSignUp ? (
+                      <>
+                        Already have an account?{' '}
+                        <button
+                          type="button"
+                          onClick={() => setIsSignUp(false)}
+                          className="text-primary hover:underline"
+                        >
+                          Sign in here
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        Don't have an account?{' '}
+                        <button
+                          type="button"
+                          onClick={() => setIsSignUp(true)}
+                          className="text-primary hover:underline"
+                        >
+                          Sign up here
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
