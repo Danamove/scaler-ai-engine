@@ -156,7 +156,7 @@ const FilterConfig = () => {
           must_have_terms: config.mustHaveTerms.split(',').map(t => t.trim()).filter(Boolean),
           required_titles: config.requiredTitles.split(',').map(t => t.trim()).filter(Boolean),
           require_top_uni: config.requireTopUni,
-        });
+        }, { onConflict: 'user_id,job_id' });
 
       if (filterError) throw filterError;
 
@@ -171,7 +171,7 @@ const FilterConfig = () => {
 
         const { error: blacklistError } = await supabase
           .from('user_blacklist')
-          .upsert(blacklistData);
+          .upsert(blacklistData, { onConflict: 'user_id,job_id,company_name' });
 
         if (blacklistError) throw blacklistError;
       }
@@ -187,7 +187,7 @@ const FilterConfig = () => {
 
         const { error: candidatesError } = await supabase
           .from('user_past_candidates')
-          .upsert(candidatesData);
+          .upsert(candidatesData, { onConflict: 'user_id,job_id,candidate_name' });
 
         if (candidatesError) throw candidatesError;
       }
