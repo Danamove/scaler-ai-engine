@@ -104,8 +104,13 @@ const Auth = () => {
     setIsResetting(true);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
+      // Use the proper project URL instead of localhost
+      const redirectUrl = window.location.hostname === 'localhost' 
+        ? 'https://fe15e92e-7210-4079-a610-155d2fdbb2ff.lovableproject.com/auth'
+        : `${window.location.origin}/auth`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth`,
+        redirectTo: redirectUrl,
       });
 
       if (error) {
