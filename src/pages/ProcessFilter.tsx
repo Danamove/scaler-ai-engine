@@ -581,12 +581,60 @@ const ProcessFilter = () => {
             const topUniList = topUniversities?.map(u => u.university_name.toLowerCase()) || [];
             const candidateEducation = candidate.education?.toLowerCase() || '';
             
-            const hasTopUni = topUniList.some(uni => 
-              candidateEducation.includes(uni) || uni.includes(candidateEducation.split(' ').slice(0, 3).join(' '))
-            );
+            // Enhanced university matching with partial names, abbreviations, and word boundaries
+            const checkUniversityMatch = (education: string, universityList: string[]) => {
+              if (!education.trim()) return false;
+              
+              return universityList.some(uni => {
+                // Direct substring match
+                if (education.includes(uni) || uni.includes(education)) {
+                  return true;
+                }
+                
+                // Check key words from university name (handle abbreviations and partial names)
+                const uniWords = uni.split(/[\s\-–—]+/).filter(w => w.length > 2 && !['of', 'the', 'for', 'and', 'in'].includes(w));
+                const eduWords = education.split(/[\s\-–—,\.()]+/).filter(w => w.length > 2);
+                
+                // If we have significant word overlap (at least 2 key words or institution name match)
+                const matches = uniWords.filter(uw => 
+                  eduWords.some(ew => ew.includes(uw) || uw.includes(ew))
+                );
+                
+                if (matches.length >= Math.min(2, uniWords.length)) {
+                  return true;
+                }
+                
+                // Handle common abbreviations and short names
+                const commonAbbreviations = {
+                  'mit': 'massachusetts institute of technology',
+                  'caltech': 'california institute of technology',
+                  'technion': 'israel institute of technology',
+                  'tau': 'tel aviv university',
+                  'huji': 'hebrew university',
+                  'bgu': 'ben-gurion university',
+                  'ubc': 'university of british columbia',
+                  'mcgill': 'mcgill university',
+                  'eth': 'eth zürich'
+                };
+                
+                // Check if education contains known abbreviations
+                for (const [abbrev, fullName] of Object.entries(commonAbbreviations)) {
+                  if ((education.includes(abbrev) && uni.includes(fullName)) ||
+                      (uni.includes(abbrev) && education.includes(fullName))) {
+                    return true;
+                  }
+                }
+                
+                return false;
+              });
+            };
+            
+            const hasTopUni = checkUniversityMatch(candidateEducation, topUniList);
             if (!hasTopUni) {
               stage2Pass = false;
-              filterReasons.push('Not from top university');
+              filterReasons.push('Education not from recognized top university');
+            } else {
+              filterReasons.push('Top university requirement met');
             }
           }
 

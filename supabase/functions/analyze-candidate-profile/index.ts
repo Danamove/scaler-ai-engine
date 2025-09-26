@@ -113,6 +113,32 @@ serve(async (req) => {
     const embeddingData = await embeddingResponse.json();
     const candidateEmbedding = embeddingData.data[0].embedding;
 
+    // Get top universities list if required
+    let topUniversitiesContext = '';
+    if (filterRules.require_top_uni) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      const { data: topUnis } = await supabaseClient
+        .from('top_universities')
+        .select('university_name, country');
+      
+      if (topUnis && topUnis.length > 0) {
+        topUniversitiesContext = `
+        Top Universities Requirement: ENABLED
+        Recognized institutions: ${topUnis.map(u => `${u.university_name} (${u.country})`).join(', ')}
+        
+        UNIVERSITY MATCHING RULES:
+        - Check education field for university names, abbreviations, or partial matches
+        - Common abbreviations: MIT, Caltech, Technion, TAU, HUJI, BGU, UBC, McGill, ETH
+        - Consider partial matches of key institution words
+        - If no recognized university found, candidate should be flagged
+        `;
+      }
+    }
+
     // Use GPT to analyze the candidate profile with structured output
     const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -134,13 +160,15 @@ serve(async (req) => {
               "education_level": "bachelor" | "master" | "phd" | "diploma" | "none",
               "must_have_score": number,
               "exclude_terms_score": number,
-              "title_match_score": number
+              "title_match_score": number,
+              "top_university_score": number
             }
             
             CRITICAL SCORING GUIDELINES:
             - must_have_score: 0-100, semantic match to expanded required terms
             - exclude_terms_score: 0-100, presence of expanded excluded terms (LOWER is better)  
             - title_match_score: 0-100, title relevance considering role+domain+seniority
+            - top_university_score: 0-100, whether education is from recognized top university (100 if found, 0 if not)
             
             SEMANTIC EQUIVALENCES (treat as identical):
             - engineer ≡ developer ≡ programmer ≡ coder
@@ -167,9 +195,12 @@ serve(async (req) => {
             
             ${synonymsContext}
             
+            ${topUniversitiesContext}
+            
             Filter Requirements:
             - Minimum years experience: ${filterRules.min_years_experience}
             - Minimum months in current role: ${filterRules.min_months_current_role}
+            - Top university required: ${filterRules.require_top_uni ? 'YES' : 'NO'}
             
             ANALYSIS TASKS:
             1. Estimate actual experience from role progression and description
@@ -178,6 +209,7 @@ serve(async (req) => {
             4. Score must-have terms match using EXPANDED terms list (consider semantic equivalence)
             5. Score exclude terms presence using EXPANDED terms list (be strict on management terms)
             6. Score title match using expanded titles and semantic equivalence rules
+            7. Score top university match: Check if education mentions any recognized institution (100 if found, 0 if not)
             
             Remember: Focus on SEMANTIC MEANING over exact keyword matching. Use the equivalence rules provided.`
           }
@@ -222,6 +254,11 @@ serve(async (req) => {
       passes_title_check: filterRules.required_titles?.length > 0 ? analysis.title_match_score >= 60 : true,
     };
 
+    // Add top university check if required
+    if (filterRules.require_top_uni) {
+      (result as any).passes_top_university_check = analysis.top_university_score >= 80;
+    }
+
     console.log('Analysis result:', result);
 
     // Initialize Supabase client for cost tracking
@@ -259,7 +296,8 @@ serve(async (req) => {
       passes_role_duration_check: false,
       passes_must_have_check: false,
       passes_exclude_check: false,
-      passes_title_check: false
+      passes_title_check: false,
+      passes_top_university_check: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
