@@ -44,7 +44,7 @@ export const useUserRole = (): UseUserRoleReturn => {
           throw roleError;
         }
       } else {
-        setRole(data.role);
+        setRole(data?.role || 'user');
       }
     } catch (err) {
       console.error('Error fetching user role:', err);
