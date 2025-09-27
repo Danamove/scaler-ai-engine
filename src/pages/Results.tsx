@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, ArrowLeft, BarChart3, Download, Users, Building, FileText, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +49,7 @@ const Results = () => {
   });
   const [loadingResults, setLoadingResults] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [rejectionReasonFilter, setRejectionReasonFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -613,8 +615,42 @@ const Results = () => {
                       Candidates who were rejected during the filtering process
                     </p>
                   </div>
+                  
+                  {/* Rejection Reason Filter */}
+                  <div className="flex items-center space-x-4">
+                    <label htmlFor="rejection-filter" className="text-sm font-medium">
+                      Filter by rejection reason:
+                    </label>
+                    <Select value={rejectionReasonFilter} onValueChange={setRejectionReasonFilter}>
+                      <SelectTrigger className="w-72">
+                        <SelectValue placeholder="Select rejection reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Show all rejections</SelectItem>
+                        <SelectItem value="Blacklisted company">Blacklisted company</SelectItem>
+                        <SelectItem value="Past candidate">Past candidate</SelectItem>
+                        <SelectItem value="NotRelevant company">NotRelevant company</SelectItem>
+                        <SelectItem value="Insufficient role duration">Insufficient role duration</SelectItem>
+                        <SelectItem value="Missing required terms">Missing required terms</SelectItem>
+                        <SelectItem value="Contains excluded terms">Contains excluded terms</SelectItem>
+                        <SelectItem value="Excluded location detected">Excluded location detected</SelectItem>
+                        <SelectItem value="Top university requirement not met">Top university requirement not met</SelectItem>
+                        <SelectItem value="No target company match">No target company match</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <CandidateTable 
-                    candidates={results.filter(r => !r.stage_1_passed || !r.stage_2_passed)} 
+                    candidates={results.filter(r => {
+                      const isRejected = !r.stage_1_passed || !r.stage_2_passed;
+                      if (!isRejected) return false;
+                      
+                      if (rejectionReasonFilter === 'all') return true;
+                      
+                      return r.filter_reasons?.some(reason => 
+                        reason.includes(rejectionReasonFilter)
+                      ) || false;
+                    })}
                     showStageInfo={false}
                     showRejectionReasons={true}
                     onDeleteCandidate={handleDeleteCandidate}

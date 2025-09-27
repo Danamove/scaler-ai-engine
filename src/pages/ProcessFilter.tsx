@@ -254,22 +254,7 @@ const ProcessFilter = () => {
           }
         }
 
-        // Check Target companies (if enabled)
-        if (stage1Pass && filterRules.use_target_companies_filter) {
-          const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
-          const currentCompany = candidate.current_company?.toLowerCase() || '';
-          const previousCompany = candidate.previous_company?.toLowerCase() || '';
-          
-          const hasTargetCompany = targetList.some(company => 
-            currentCompany.includes(company) || previousCompany.includes(company) ||
-            company.includes(currentCompany) || company.includes(previousCompany)
-          );
-          
-          if (!hasTargetCompany) {
-            stage1Pass = false;
-            filterReasons.push('No target company match');
-          }
-        }
+        // Target companies check moved to Stage 2
 
         if (stage1Pass) {
           stage1Passed++;
@@ -391,33 +376,106 @@ const ProcessFilter = () => {
                 batchData.results.forEach((aiResult: any, index: number) => {
                   const item = batch[index];
                   if (item && aiResult) {
-                    const stage2Pass = aiResult.overall_pass;
+                    const candidate = item.candidate;
+                    const filterReasons = [...item.filterReasons];
+                    let stage2Pass = aiResult.overall_pass;
+                    
+                    // Generate detailed rejection reasons based on AI analysis
+                    if (!aiResult.passes_role_duration_check) {
+                      filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role || 0} months (required: ${filterRules.min_months_current_role || 0})`);
+                    }
+                    if (!aiResult.passes_must_have_terms_check && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+                      filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
+                    }
+                    if (!aiResult.passes_exclude_terms_check && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+                      filterReasons.push(`Contains excluded terms: ${filterRules.exclude_terms.join(', ')}`);
+                    }
+                    if (!aiResult.passes_location_exclusion_check && filterRules.exclude_location_terms && filterRules.exclude_location_terms.length > 0) {
+                      filterReasons.push(`Excluded location detected: ${filterRules.exclude_location_terms.join(', ')}`);
+                    }
+                    if (aiResult.passes_top_university_check === false) {
+                      filterReasons.push('Top university requirement not met');
+                    }
+                    
+                    // Check Target companies (moved from Stage 1 to Stage 2)
+                    if (stage2Pass && filterRules.use_target_companies_filter) {
+                      const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
+                      const currentCompany = candidate.current_company?.toLowerCase() || '';
+                      const previousCompany = candidate.previous_company?.toLowerCase() || '';
+                      
+                      const hasTargetCompany = targetList.some(company => 
+                        currentCompany.includes(company) || previousCompany.includes(company) ||
+                        company.includes(currentCompany) || company.includes(previousCompany)
+                      );
+                      
+                      if (!hasTargetCompany) {
+                        stage2Pass = false;
+                        filterReasons.push('No target company match');
+                      }
+                    }
+                    
                     if (stage2Pass) stage2Passed++;
                     
                     results.push({
-                      raw_data_id: item.candidate.id,
+                      raw_data_id: candidate.id,
                       user_id: getActiveUserId(),
                       job_id: 'current',
                       stage_1_passed: true,
                       stage_2_passed: stage2Pass,
-                      filter_reasons: stage2Pass ? item.filterReasons : [...item.filterReasons, aiResult.reasoning]
+                      filter_reasons: filterReasons
                     });
                   }
                 });
               } else {
-                // Fallback for failed batches - basic checks only
+                // Fallback for failed batches - detailed checks with specific reasons
                 batch.forEach((item: any) => {
                   const candidate = item.candidate;
                   const filterReasons = [...item.filterReasons];
                   let stage2Pass = true;
 
-                  // Basic fallback checks - only months in current role
-                  if (stage2Pass && candidate.months_in_current_role < (filterRules.min_months_current_role || 0)) {
+                  // Role duration check
+                  if (candidate.months_in_current_role < (filterRules.min_months_current_role || 0)) {
                     stage2Pass = false;
-                    filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role} months`);
+                    filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role || 0} months (required: ${filterRules.min_months_current_role || 0})`);
                   }
 
-                  // Basic location exclusion check (simple fallback)
+                  // Must have terms check (basic fallback)
+                  if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+                    const candidateText = [
+                      candidate.current_title,
+                      candidate.profile_summary,
+                      candidate.education
+                    ].join(' ').toLowerCase();
+                    
+                    const hasMustHaveTerms = filterRules.must_have_terms.some(term => 
+                      candidateText.includes(term.toLowerCase())
+                    );
+                    
+                    if (!hasMustHaveTerms) {
+                      stage2Pass = false;
+                      filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
+                    }
+                  }
+
+                  // Exclude terms check
+                  if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+                    const candidateText = [
+                      candidate.current_title,
+                      candidate.profile_summary,
+                      candidate.education
+                    ].join(' ').toLowerCase();
+                    
+                    const hasExcludedTerms = filterRules.exclude_terms.some(term => 
+                      candidateText.includes(term.toLowerCase())
+                    );
+                    
+                    if (hasExcludedTerms) {
+                      stage2Pass = false;
+                      filterReasons.push(`Contains excluded terms: ${filterRules.exclude_terms.join(', ')}`);
+                    }
+                  }
+
+                  // Location exclusion check
                   if (stage2Pass && filterRules.exclude_location_terms && filterRules.exclude_location_terms.length > 0) {
                     const candidateLocation = [
                       candidate.education,
@@ -431,7 +489,50 @@ const ProcessFilter = () => {
                     
                     if (hasExcludedLocation) {
                       stage2Pass = false;
-                      filterReasons.push(`Excluded location detected`);
+                      filterReasons.push(`Excluded location detected: ${filterRules.exclude_location_terms.join(', ')}`);
+                    }
+                  }
+
+                  // Top university check
+                  if (stage2Pass && filterRules.require_top_uni) {
+                    // Simple fallback - assume no top uni if no education data
+                    if (!candidate.education) {
+                      stage2Pass = false;
+                      filterReasons.push('Top university requirement not met');
+                    }
+                  }
+
+                  // Target companies check (moved from Stage 1)
+                  if (stage2Pass && filterRules.use_target_companies_filter) {
+                    const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
+                    const currentCompany = candidate.current_company?.toLowerCase() || '';
+                    const previousCompany = candidate.previous_company?.toLowerCase() || '';
+                    
+                    const hasTargetCompany = targetList.some(company => 
+                      currentCompany.includes(company) || previousCompany.includes(company) ||
+                      company.includes(currentCompany) || company.includes(previousCompany)
+                    );
+                    
+                    if (!hasTargetCompany) {
+                      stage2Pass = false;
+                      filterReasons.push('No target company match');
+                    }
+                  }
+
+                  // Target companies check (moved from Stage 1)
+                  if (stage2Pass && filterRules.use_target_companies_filter) {
+                    const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
+                    const currentCompany = candidate.current_company?.toLowerCase() || '';
+                    const previousCompany = candidate.previous_company?.toLowerCase() || '';
+                    
+                    const hasTargetCompany = targetList.some(company => 
+                      currentCompany.includes(company) || previousCompany.includes(company) ||
+                      company.includes(currentCompany) || company.includes(previousCompany)
+                    );
+                    
+                    if (!hasTargetCompany) {
+                      stage2Pass = false;
+                      filterReasons.push('No target company match');
                     }
                   }
 
