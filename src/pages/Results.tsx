@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { Filter, ArrowLeft, BarChart3, Download, Users, Building, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { Filter, ArrowLeft, BarChart3, Download, Users, Building, FileText, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -176,6 +177,54 @@ const Results = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDeleteCandidate = async (candidateId: string) => {
+    const activeUserId = getActiveUserId();
+    if (!activeUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from('filtered_results')
+        .delete()
+        .eq('id', candidateId)
+        .eq('user_id', activeUserId);
+
+      if (error) throw error;
+
+      // Update local state by removing the deleted candidate
+      setResults(prevResults => {
+        const newResults = prevResults.filter(r => r.id !== candidateId);
+        
+        // Update stats based on new results
+        const totalCandidates = newResults.length;
+        const stage1Passed = newResults.filter(r => r.stage_1_passed).length;
+        const finalResults = newResults.filter(r => r.stage_1_passed && r.stage_2_passed).length;
+        const stage2Passed = finalResults;
+
+        setStats({
+          total_candidates: totalCandidates,
+          stage_1_passed: stage1Passed,
+          stage_2_passed: stage2Passed,
+          final_results: finalResults
+        });
+
+        return newResults;
+      });
+
+      toast({
+        title: "Candidate Deleted",
+        description: "The candidate has been removed from your results.",
+      });
+
+    } catch (error: any) {
+      console.error('Delete candidate error:', error);
+      toast({
+        title: "Delete Error",
+        description: error.message || "Failed to delete candidate.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleExport = async (stage: 'stage1' | 'stage2' | 'final') => {
@@ -507,10 +556,11 @@ const Results = () => {
                       Export Stage 1
                     </Button>
                   </div>
-                  <CandidateTable 
-                    candidates={results.filter(r => r.stage_1_passed)} 
-                    showStageInfo={false}
-                  />
+                      <CandidateTable 
+                        candidates={results.filter(r => r.stage_1_passed)}
+                        showStageInfo={false}
+                        onDeleteCandidate={handleDeleteCandidate}
+                      />
                 </TabsContent>
 
                 <TabsContent value="stage2" className="space-y-4">
@@ -528,10 +578,11 @@ const Results = () => {
                       Export Stage 2
                     </Button>
                   </div>
-                  <CandidateTable 
-                    candidates={results.filter(r => r.stage_2_passed)} 
-                    showStageInfo={false}
-                  />
+                      <CandidateTable 
+                        candidates={results.filter(r => r.stage_2_passed)}
+                        showStageInfo={false}
+                        onDeleteCandidate={handleDeleteCandidate}
+                      />
                 </TabsContent>
 
                 <TabsContent value="final" className="space-y-4">
@@ -552,6 +603,7 @@ const Results = () => {
                   <CandidateTable 
                     candidates={results.filter(r => r.stage_1_passed && r.stage_2_passed)} 
                     showStageInfo={true}
+                    onDeleteCandidate={handleDeleteCandidate}
                   />
                 </TabsContent>
 
@@ -565,6 +617,7 @@ const Results = () => {
                     candidates={results.filter(r => !r.stage_1_passed || !r.stage_2_passed)} 
                     showStageInfo={false}
                     showRejectionReasons={true}
+                    onDeleteCandidate={handleDeleteCandidate}
                   />
                 </TabsContent>
               </Tabs>
@@ -580,9 +633,10 @@ interface CandidateTableProps {
   candidates: CandidateResult[];
   showStageInfo: boolean;
   showRejectionReasons?: boolean;
+  onDeleteCandidate?: (candidateId: string) => void;
 }
 
-const CandidateTable = ({ candidates, showStageInfo, showRejectionReasons = false }: CandidateTableProps) => {
+const CandidateTable = ({ candidates, showStageInfo, showRejectionReasons = false, onDeleteCandidate }: CandidateTableProps) => {
   if (candidates.length === 0) {
     return (
       <div className="text-center py-12">
@@ -607,6 +661,7 @@ const CandidateTable = ({ candidates, showStageInfo, showRejectionReasons = fals
             {showStageInfo && <TableHead>Status</TableHead>}
             {showRejectionReasons && <TableHead>Rejection Reasons</TableHead>}
             <TableHead>LinkedIn</TableHead>
+            {onDeleteCandidate && <TableHead>Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -656,6 +711,34 @@ const CandidateTable = ({ candidates, showStageInfo, showRejectionReasons = fals
                   'N/A'
                 )}
               </TableCell>
+              {onDeleteCandidate && (
+                <TableCell>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Candidate</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete {candidate.full_name}? This will remove them from your results and exports. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => onDeleteCandidate(candidate.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
