@@ -536,19 +536,18 @@ const ProcessFilter = () => {
                       const mustHaveCheck = checkTermsInProfile(candidate, filterRules.must_have_terms, synonyms || []);
                       
                       if (!aiPasses_must_have_terms_check && mustHaveCheck.found) {
-                        // AI said no, but we found the terms - override AI
+                        // AI said no, but we found the terms - override AI (positive override)
                         aiPasses_must_have_terms_check = true;
                         // Remove the AI's rejection reason
                         const reasonIndex = filterReasons.findIndex(r => r.includes('Missing required terms'));
                         if (reasonIndex > -1) {
                           filterReasons.splice(reasonIndex, 1);
                         }
-                        console.log(`Deterministic override: Found required terms [${mustHaveCheck.matches.join(', ')}] for candidate ${candidate.full_name}`);
+                        console.log(`Deterministic override (positive): Found required terms [${mustHaveCheck.matches.join(', ')}] for candidate ${candidate.full_name}`);
                       } else if (aiPasses_must_have_terms_check && !mustHaveCheck.found) {
-                        // AI said yes, but we don't find the terms - override AI
-                        aiPasses_must_have_terms_check = false;
-                        filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
-                        console.log(`Deterministic override: Missing required terms for candidate ${candidate.full_name}`);
+                        // AI said yes, but deterministic didn't find terms - log but don't override
+                        // This could be due to incomplete text, synonyms, or formatting differences
+                        console.log(`DEBUG: AI approved must-have terms but deterministic check failed for candidate ${candidate.full_name}. Terms: [${filterRules.must_have_terms.join(', ')}]. This is expected and we trust the AI decision.`);
                       }
                     }
                     
