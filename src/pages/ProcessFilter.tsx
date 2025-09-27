@@ -10,6 +10,115 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 
+// Helper functions for enhanced filtering
+const normalizeCompanyName = (companyName: string): string => {
+  if (!companyName) return '';
+  
+  return companyName
+    .toLowerCase()
+    .trim()
+    .replace(/[.,\-()[\]]/g, ' ') // Remove punctuation
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/\b(ltd|inc|llc|technologies|tech|labs|israel|corp|co|company|corporation|limited|group|systems|software|solutions)\b/gi, '') // Remove common suffixes
+    .trim();
+};
+
+const getCompanyAliases = (companyName: string): string[] => {
+  const normalized = normalizeCompanyName(companyName);
+  const aliases = [normalized];
+  
+  // Add common aliases
+  const aliasMap: { [key: string]: string[] } = {
+    'aws': ['amazon', 'amazon web services'],
+    'amazon': ['aws', 'amazon web services'],
+    'meta': ['facebook'],
+    'facebook': ['meta'],
+    'google': ['google cloud', 'alphabet'],
+    'microsoft': ['microsoft azure', 'ms'],
+    'apple': ['apple inc'],
+    'netflix': ['nflx']
+  };
+  
+  Object.entries(aliasMap).forEach(([key, values]) => {
+    if (normalized.includes(key) || values.some(v => normalized.includes(v))) {
+      aliases.push(...values, key);
+    }
+  });
+  
+  return [...new Set(aliases)]; // Remove duplicates
+};
+
+const isCompanyMatch = (candidateCompany: string, blacklistCompany: string): boolean => {
+  if (!candidateCompany || !blacklistCompany) return false;
+  
+  const candidateAliases = getCompanyAliases(candidateCompany);
+  const blacklistAliases = getCompanyAliases(blacklistCompany);
+  
+  // Check for any alias match with contains logic in both directions
+  for (const candAlias of candidateAliases) {
+    for (const blackAlias of blacklistAliases) {
+      if (candAlias.includes(blackAlias) || blackAlias.includes(candAlias)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+};
+
+const expandTermsWithSynonyms = (terms: string[], synonyms: any[]): string[] => {
+  if (!terms || terms.length === 0) return [];
+  
+  const expandedTerms = new Set<string>();
+  
+  terms.forEach(term => {
+    expandedTerms.add(term.toLowerCase().trim());
+    
+    // Find synonyms for this term
+    synonyms.forEach(synonym => {
+      if (synonym.canonical_term.toLowerCase() === term.toLowerCase().trim()) {
+        expandedTerms.add(synonym.variant_term.toLowerCase().trim());
+      }
+      if (synonym.variant_term.toLowerCase() === term.toLowerCase().trim()) {
+        expandedTerms.add(synonym.canonical_term.toLowerCase().trim());
+      }
+    });
+  });
+  
+  return Array.from(expandedTerms);
+};
+
+const hasWordBoundaryMatch = (text: string, term: string): boolean => {
+  if (!text || !term) return false;
+  
+  const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  return regex.test(text);
+};
+
+const checkTermsInProfile = (candidate: any, terms: string[], synonyms: any[]): { found: boolean; matches: string[] } => {
+  const expandedTerms = expandTermsWithSynonyms(terms, synonyms);
+  const matches: string[] = [];
+  
+  const profileText = [
+    candidate.current_title,
+    candidate.profile_summary,
+    candidate.education,
+    candidate.previous_company,
+    candidate.current_company
+  ].filter(Boolean).join(' ').toLowerCase();
+  
+  expandedTerms.forEach(term => {
+    if (hasWordBoundaryMatch(profileText, term)) {
+      matches.push(term);
+    }
+  });
+  
+  return {
+    found: matches.length > 0,
+    matches
+  };
+};
+
 interface ProcessStats {
   totalCandidates: number;
   processed: number;
@@ -174,16 +283,18 @@ const ProcessFilter = () => {
         .from('target_companies')
         .select('company_name');
 
-      // Get user lists
+      // Get user lists (filtered by job_id for consistency)
       const { data: blacklistCompanies } = await supabase
         .from('user_blacklist')
         .select('company_name')
-        .eq('user_id', getActiveUserId());
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', filterRules.job_id);
 
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
-        .eq('user_id', getActiveUserId());
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', filterRules.job_id);
 
       console.log('Loaded lists:', {
         synonyms: synonyms?.length || 0,
@@ -223,11 +334,23 @@ const ProcessFilter = () => {
         let stage1Pass = true;
         const filterReasons = [];
 
-        // Check blacklist first (current company only)
-        const blacklist = blacklistCompanies?.map(b => b.company_name.toLowerCase()) || [];
-        if (candidate.current_company && blacklist.includes(candidate.current_company.toLowerCase())) {
-          stage1Pass = false;
-          filterReasons.push('Blacklisted company');
+        // Enhanced blacklist check with normalization and aliases
+        const blacklist = blacklistCompanies?.map(b => b.company_name) || [];
+        let blacklistMatch = null;
+        
+        if (candidate.current_company) {
+          for (const blacklistCompany of blacklist) {
+            if (isCompanyMatch(candidate.current_company, blacklistCompany)) {
+              blacklistMatch = blacklistCompany;
+              break;
+            }
+          }
+          
+          if (blacklistMatch) {
+            stage1Pass = false;
+            filterReasons.push(`Blacklisted company: ${blacklistMatch}`);
+            console.log(`Blacklist match - Candidate: ${candidate.full_name}, Company: ${candidate.current_company}, Matched: ${blacklistMatch}`);
+          }
         }
 
         // Check past candidates
@@ -397,6 +520,59 @@ const ProcessFilter = () => {
                       filterReasons.push('Top university requirement not met');
                     }
                     
+                    // Deterministic override to correct AI false negatives/positives
+                    let aiPasses_must_have_terms_check = aiResult.passes_must_have_terms_check;
+                    let aiPasses_exclude_terms_check = aiResult.passes_exclude_terms_check;
+                    
+                    // Check must-have terms deterministically and override AI if needed
+                    if (filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
+                      const mustHaveCheck = checkTermsInProfile(candidate, filterRules.must_have_terms, synonyms || []);
+                      
+                      if (!aiPasses_must_have_terms_check && mustHaveCheck.found) {
+                        // AI said no, but we found the terms - override AI
+                        aiPasses_must_have_terms_check = true;
+                        // Remove the AI's rejection reason
+                        const reasonIndex = filterReasons.findIndex(r => r.includes('Missing required terms'));
+                        if (reasonIndex > -1) {
+                          filterReasons.splice(reasonIndex, 1);
+                        }
+                        console.log(`Deterministic override: Found required terms [${mustHaveCheck.matches.join(', ')}] for candidate ${candidate.full_name}`);
+                      } else if (aiPasses_must_have_terms_check && !mustHaveCheck.found) {
+                        // AI said yes, but we don't find the terms - override AI
+                        aiPasses_must_have_terms_check = false;
+                        filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
+                        console.log(`Deterministic override: Missing required terms for candidate ${candidate.full_name}`);
+                      }
+                    }
+                    
+                    // Check exclude terms deterministically and override AI if needed  
+                    if (filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
+                      const excludeCheck = checkTermsInProfile(candidate, filterRules.exclude_terms, synonyms || []);
+                      
+                      if (aiPasses_exclude_terms_check && excludeCheck.found) {
+                        // AI said pass, but we found excluded terms - override AI
+                        aiPasses_exclude_terms_check = false;
+                        filterReasons.push(`Contains excluded terms: ${excludeCheck.matches.join(', ')}`);
+                        console.log(`Deterministic override: Found excluded terms [${excludeCheck.matches.join(', ')}] for candidate ${candidate.full_name}`);
+                      } else if (!aiPasses_exclude_terms_check && !excludeCheck.found) {
+                        // AI said fail, but we don't find excluded terms - override AI
+                        aiPasses_exclude_terms_check = true;
+                        // Remove the AI's rejection reason
+                        const reasonIndex = filterReasons.findIndex(r => r.includes('Contains excluded terms'));
+                        if (reasonIndex > -1) {
+                          filterReasons.splice(reasonIndex, 1);
+                        }
+                        console.log(`Deterministic override: No excluded terms found for candidate ${candidate.full_name}`);
+                      }
+                    }
+                    
+                    // Recalculate stage2Pass based on corrected flags
+                    stage2Pass = aiResult.passes_role_duration_check && 
+                                aiPasses_must_have_terms_check && 
+                                aiPasses_exclude_terms_check && 
+                                aiResult.passes_location_exclusion_check && 
+                                (aiResult.passes_top_university_check !== false);
+                    
                     // Check Target companies (moved from Stage 1 to Stage 2)
                     if (stage2Pass && filterRules.use_target_companies_filter) {
                       const targetList = targetCompanies?.map(c => c.company_name.toLowerCase()) || [];
@@ -439,39 +615,23 @@ const ProcessFilter = () => {
                     filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role || 0} months (required: ${filterRules.min_months_current_role || 0})`);
                   }
 
-                  // Must have terms check (basic fallback)
+                  // Enhanced must have terms check with synonyms
                   if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-                    const candidateText = [
-                      candidate.current_title,
-                      candidate.profile_summary,
-                      candidate.education
-                    ].join(' ').toLowerCase();
+                    const mustHaveCheck = checkTermsInProfile(candidate, filterRules.must_have_terms, synonyms || []);
                     
-                    const hasMustHaveTerms = filterRules.must_have_terms.some(term => 
-                      candidateText.includes(term.toLowerCase())
-                    );
-                    
-                    if (!hasMustHaveTerms) {
+                    if (!mustHaveCheck.found) {
                       stage2Pass = false;
                       filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
                     }
                   }
 
-                  // Exclude terms check
+                  // Enhanced exclude terms check with synonyms  
                   if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-                    const candidateText = [
-                      candidate.current_title,
-                      candidate.profile_summary,
-                      candidate.education
-                    ].join(' ').toLowerCase();
+                    const excludeCheck = checkTermsInProfile(candidate, filterRules.exclude_terms, synonyms || []);
                     
-                    const hasExcludedTerms = filterRules.exclude_terms.some(term => 
-                      candidateText.includes(term.toLowerCase())
-                    );
-                    
-                    if (hasExcludedTerms) {
+                    if (excludeCheck.found) {
                       stage2Pass = false;
-                      filterReasons.push(`Contains excluded terms: ${filterRules.exclude_terms.join(', ')}`);
+                      filterReasons.push(`Contains excluded terms: ${excludeCheck.matches.join(', ')}`);
                     }
                   }
 
