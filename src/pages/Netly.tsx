@@ -30,6 +30,7 @@ interface NetworkConnection {
   relationship: string;
   email?: string;
   phone?: string;
+  linkedin_url?: string;
 }
 
 interface NetworkMatch {
@@ -122,14 +123,22 @@ const Netly = () => {
           try {
             const connections = (results.data as any[])
               .filter(row => Object.values(row).some(v => String(v ?? '').trim().length > 0))
-              .map(row => ({
-                name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
-                title: row.title || row.jobTitle || '',
-                company: row.company || row.companyName || '',
-                relationship: row.relationship || row.connectionType || 'Connection',
-                email: row.email || '',
-                phone: row.phone || row.phoneNumber || ''
-              }));
+              .map(row => {
+                // Look for LinkedIn URL in various common field names
+                const linkedinUrl = row.linkedinProfileUrl || row.linkedinUrl || row['LinkedIn URL'] || 
+                                   row.profileUrl || row.linkedin_profile_url || row['Profile URL'] || 
+                                   row.linkedIn || row.linkedin || '';
+                
+                return {
+                  name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+                  title: row.title || row.jobTitle || '',
+                  company: row.company || row.companyName || '',
+                  relationship: row.relationship || row.connectionType || 'Connection',
+                  email: row.email || '',
+                  phone: row.phone || row.phoneNumber || '',
+                  linkedin_url: linkedinUrl || ''
+                };
+              });
             resolve(connections);
           } catch (error) {
             reject(error);
@@ -170,88 +179,58 @@ const Netly = () => {
 
       filteredCandidates.forEach(candidate => {
         const candidateConnections: NetworkConnection[] = [];
-        let matchScore = 0;
 
         connections.forEach(connection => {
-          // Normalize strings for better matching
+          let isMatch = false;
+          let matchType = '';
+
+          // Normalize names for exact matching
           const candidateName = candidate.full_name.toLowerCase().trim();
           const connectionName = connection.name.toLowerCase().trim();
-          const candidateCompany = candidate.current_company?.toLowerCase().trim() || '';
-          const connectionCompany = connection.company?.toLowerCase().trim() || '';
           
-          // Split names for partial matching
-          const candidateNameParts = candidateName.split(/\s+/);
-          const connectionNameParts = connectionName.split(/\s+/);
+          // Normalize LinkedIn URLs for matching
+          const candidateLinkedIn = candidate.linkedin_url?.toLowerCase().trim() || '';
+          const connectionLinkedIn = connection.linkedin_url?.toLowerCase().trim() || '';
 
-          // Match by name - more sophisticated matching
-          let nameMatch = false;
-          if (candidateName === connectionName) {
-            nameMatch = true;
-            matchScore += 20; // Exact name match
-          } else {
-            // Check if any combination of first/last names match
-            const candidateFirstName = candidateNameParts[0] || '';
-            const candidateLastName = candidateNameParts[candidateNameParts.length - 1] || '';
-            const connectionFirstName = connectionNameParts[0] || '';
-            const connectionLastName = connectionNameParts[connectionNameParts.length - 1] || '';
-            
-            if (candidateFirstName && connectionFirstName && 
-                candidateFirstName === connectionFirstName &&
-                candidateLastName && connectionLastName &&
-                candidateLastName === connectionLastName) {
-              nameMatch = true;
-              matchScore += 15; // First + Last name match
-            } else if (candidateFirstName && connectionFirstName && 
-                      candidateFirstName === connectionFirstName) {
-              nameMatch = true;
-              matchScore += 8; // First name match only
-            } else if (candidateLastName && connectionLastName && 
-                      candidateLastName === connectionLastName && 
-                      candidateLastName.length > 2) {
-              nameMatch = true;
-              matchScore += 5; // Last name match only (if not too short)
-            }
+          // Match by exact full name
+          if (candidateName && connectionName && candidateName === connectionName) {
+            isMatch = true;
+            matchType = 'Name';
           }
           
-          // Match by company - more flexible matching
-          let companyMatch = false;
-          if (candidateCompany && connectionCompany) {
-            if (candidateCompany === connectionCompany) {
-              companyMatch = true;
-              matchScore += 10; // Exact company match
-            } else if (candidateCompany.includes(connectionCompany) || 
-                      connectionCompany.includes(candidateCompany)) {
-              companyMatch = true;
-              matchScore += 7; // Partial company match
-            }
+          // Match by LinkedIn URL (if both exist and are the same)
+          if (!isMatch && candidateLinkedIn && connectionLinkedIn && 
+              candidateLinkedIn === connectionLinkedIn) {
+            isMatch = true;
+            matchType = 'LinkedIn URL';
           }
-          
-          // Only add connection if there's a meaningful match
-          if (nameMatch || companyMatch) {
+
+          // Only add connection if there's an exact match
+          if (isMatch) {
             candidateConnections.push(connection);
-            console.log(`Match found: ${candidateName} <-> ${connectionName}, Score: +${nameMatch ? (candidateName === connectionName ? 20 : 15) : 0} (name) +${companyMatch ? 10 : 0} (company)`);
+            console.log(`Match found: ${candidate.full_name} <-> ${connection.name} (${matchType})`);
           }
         });
 
-        // Only add candidates that have real connections
+        // Only add candidates that have exact matches
         if (candidateConnections.length > 0) {
           foundMatches.push({
             candidate,
             connections: candidateConnections,
-            matchScore
+            matchScore: candidateConnections.length // Simple count of matches
           });
         }
       });
 
-      // Sort by match score (highest first)
-      foundMatches.sort((a, b) => b.matchScore - a.matchScore);
+      // Sort by number of connections (highest first)
+      foundMatches.sort((a, b) => b.connections.length - a.connections.length);
       setMatches(foundMatches);
 
-      console.log(`Analysis complete: ${foundMatches.length} matches found out of ${filteredCandidates.length} candidates`);
+      console.log(`Analysis complete: ${foundMatches.length} exact matches found out of ${filteredCandidates.length} candidates`);
       
       toast({
         title: "Analysis Complete",
-        description: `Found ${foundMatches.length} candidates with network connections out of ${filteredCandidates.length} filtered candidates`,
+        description: `Found ${foundMatches.length} candidates with exact network matches out of ${filteredCandidates.length} filtered candidates`,
       });
     } catch (error) {
       console.error('Network analysis error:', error);
@@ -533,7 +512,7 @@ const Netly = () => {
                             </div>
                             <div className="text-right">
                               <Badge variant="outline">
-                                Score: {match.matchScore}
+                                {match.connections.length} connection{match.connections.length !== 1 ? 's' : ''}
                               </Badge>
                             </div>
                           </div>
@@ -542,24 +521,37 @@ const Netly = () => {
                             <h4 className="font-medium mb-2">Network Connections ({match.connections.length})</h4>
                             <div className="space-y-2">
                               {match.connections.map((connection, connIndex) => (
-                                <div key={connIndex} className="bg-muted/30 rounded p-3">
-                                  <div className="flex items-start justify-between">
-                                    <div>
-                                      <p className="font-medium">{connection.name}</p>
-                                      <p className="text-sm text-muted-foreground">{connection.title}</p>
-                                      <p className="text-sm text-muted-foreground">{connection.company}</p>
-                                    </div>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {connection.relationship}
-                                    </Badge>
-                                  </div>
-                                  {(connection.email || connection.phone) && (
-                                    <div className="mt-2 text-xs text-muted-foreground">
-                                      {connection.email && <p>Email: {connection.email}</p>}
-                                      {connection.phone && <p>Phone: {connection.phone}</p>}
-                                    </div>
-                                  )}
-                                </div>
+                                 <div key={connIndex} className="bg-muted/30 rounded p-3">
+                                   <div className="flex items-start justify-between">
+                                     <div className="flex-1">
+                                       <p className="font-medium">{connection.name}</p>
+                                       <p className="text-sm text-muted-foreground">{connection.title}</p>
+                                       <p className="text-sm text-muted-foreground">{connection.company}</p>
+                                       {connection.linkedin_url && (
+                                         <a 
+                                           href={connection.linkedin_url} 
+                                           target="_blank" 
+                                           rel="noopener noreferrer"
+                                           className="text-sm text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                                         >
+                                           LinkedIn Profile
+                                           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                           </svg>
+                                         </a>
+                                       )}
+                                     </div>
+                                     <Badge variant="secondary" className="text-xs">
+                                       {connection.relationship}
+                                     </Badge>
+                                   </div>
+                                   {(connection.email || connection.phone) && (
+                                     <div className="mt-2 text-xs text-muted-foreground">
+                                       {connection.email && <p>Email: {connection.email}</p>}
+                                       {connection.phone && <p>Phone: {connection.phone}</p>}
+                                     </div>
+                                   )}
+                                 </div>
                               ))}
                             </div>
                           </div>
