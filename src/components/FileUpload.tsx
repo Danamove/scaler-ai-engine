@@ -129,7 +129,15 @@ export const FileUpload = ({
           current_company: row.companyName || '',
           previous_company: row.previousCompanyName || '',
           linkedin_url: row.linkedinProfileUrl || '',
-          profile_summary: row.linkedinDescription || row.profilesummery || '',
+          profile_summary: [
+            row.linkedinDescription || row.profilesummery || '',
+            row.linkedinSkillsLabel || '',
+            row.linkedinSkills || '',
+            row.skills || '',
+            row.technologies || '',
+            row.expertise || '',
+            row.competencies || ''
+          ].filter(Boolean).join(' '),
           education: row.linkedinSchoolName || '',
           years_of_experience: getYearsFromDateRange(row.linkedinJobDateRange || ''),
           months_in_current_role: getCurrentRoleMonths(row.linkedinJobDateRange || ''),

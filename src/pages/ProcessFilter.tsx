@@ -104,7 +104,14 @@ const checkTermsInProfile = (candidate: any, terms: string[], synonyms: any[]): 
     candidate.profile_summary,
     candidate.education,
     candidate.previous_company,
-    candidate.current_company
+    candidate.current_company,
+    // Check additional skill fields from raw data
+    candidate.linkedinSkillsLabel,
+    candidate.linkedinSkills,
+    candidate.skills,
+    candidate.technologies,
+    candidate.expertise,
+    candidate.competencies
   ].filter(Boolean).join(' ').toLowerCase();
   
   expandedTerms.forEach(term => {
