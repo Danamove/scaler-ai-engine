@@ -153,6 +153,12 @@ serve(async (req) => {
             role: 'system',
             content: `You are an expert HR analyst. Analyze candidate profiles and provide structured assessments.
             
+            LOGIC SUPPORT: When evaluating terms, interpret AND/OR operators:
+            - "node AND react" means BOTH terms must be present
+            - "typescript OR javascript" means EITHER term is acceptable  
+            - "(senior AND manager) OR lead" means either (both senior AND manager) OR lead
+            - Default comma separation = OR logic
+            
             Always respond with ONLY valid JSON in this exact format:
             {
               "estimated_years_experience": number,

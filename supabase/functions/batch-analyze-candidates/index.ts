@@ -183,9 +183,20 @@ serve(async (req) => {
         return `${index + 1}. ID:${candidate.id} Name:${candidate.full_name} Title:${candidate.current_title || 'N/A'} Company:${candidate.current_company || 'N/A'} Exp:${candidate.years_of_experience || 'N/A'}y Role:${candidate.months_in_current_role || 'N/A'}m Edu:${candidate.education || 'N/A'} Summary:${(candidate.profile_summary || '').substring(0, 200)}`;
       }).join('\n');
 
+      const parseLogicTerms = (terms: string[]): string => {
+        if (!terms || terms.length === 0) return 'None';
+        const input = terms.join(', ');
+        
+        // Check if contains logic operators
+        if (input.includes(' AND ') || input.includes(' OR ') || input.includes('&') || input.includes('|')) {
+          return `LOGIC:"${input}" (expanded: ${JSON.stringify(expandTerms(terms))})`;
+        }
+        return JSON.stringify(expandTerms(terms));
+      };
+
       return `Analyze ${candidates.length} candidates:
 
-RULES: MinRole:${filterRules.min_months_current_role || 0}m MustHave:${filterRules.must_have_terms ? JSON.stringify(expandTerms(filterRules.must_have_terms)) : 'None'} Exclude:${filterRules.exclude_terms ? JSON.stringify(expandTerms(filterRules.exclude_terms)) : 'None'} ExcludeLocation:${filterRules.exclude_location_terms ? JSON.stringify(filterRules.exclude_location_terms) : 'None'} Titles:${filterRules.required_titles ? JSON.stringify(expandTerms(filterRules.required_titles)) : 'None'} TopUni:${filterRules.require_top_uni ? 'Yes' : 'No'}
+RULES: MinRole:${filterRules.min_months_current_role || 0}m MustHave:${parseLogicTerms(filterRules.must_have_terms || [])} Exclude:${parseLogicTerms(filterRules.exclude_terms || [])} ExcludeLocation:${filterRules.exclude_location_terms ? JSON.stringify(filterRules.exclude_location_terms) : 'None'} Titles:${parseLogicTerms(filterRules.required_titles || [])} TopUni:${filterRules.require_top_uni ? 'Yes' : 'No'}
 
 ${candidatesData}
 
@@ -215,7 +226,13 @@ IMPORTANT: For location exclusion - only check ExcludeLocation terms against can
             messages: [
               {
                 role: 'system',
-                content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal. 
+                 content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal.
+
+LOGIC SUPPORT: When you see "LOGIC:" in rules, interpret AND/OR operators:
+- "node AND react" means BOTH terms must be present
+- "typescript OR javascript" means EITHER term is acceptable  
+- "(senior AND manager) OR lead" means either (both senior AND manager) OR lead
+- Default comma separation = OR logic
 
 CRITICAL: For location exclusion (passes_location_exclusion_check) - ONLY check ExcludeLocation terms against candidate's actual location (education, current company location), NOT against skills, job titles, or other profile content. Location terms should only match location data.
 

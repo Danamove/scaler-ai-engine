@@ -66,6 +66,9 @@ const isCompanyMatch = (candidateCompany: string, blacklistCompany: string): boo
   return false;
 };
 
+// Import logic parser for enhanced term matching
+import { checkTermsWithLogic } from '@/lib/logicParser';
+
 const expandTermsWithSynonyms = (terms: string[], synonyms: any[]): string[] => {
   if (!terms || terms.length === 0) return [];
   
@@ -124,6 +127,11 @@ const checkTermsInProfile = (candidate: any, terms: string[], synonyms: any[]): 
     found: matches.length > 0,
     matches
   };
+};
+
+// Enhanced function for logic-based term checking
+const checkTermsWithLogicInProfile = (candidate: any, input: string, synonyms: any[]): { found: boolean; matches: string[] } => {
+  return checkTermsWithLogic(candidate, input, synonyms);
 };
 
 interface ProcessStats {
@@ -621,19 +629,21 @@ const ProcessFilter = () => {
                     filterReasons.push(`Insufficient role duration: ${candidate.months_in_current_role || 0} months (required: ${filterRules.min_months_current_role || 0})`);
                   }
 
-                  // Enhanced must have terms check with synonyms
+                  // Enhanced must have terms check with logic support
                   if (stage2Pass && filterRules.must_have_terms && filterRules.must_have_terms.length > 0) {
-                    const mustHaveCheck = checkTermsInProfile(candidate, filterRules.must_have_terms, synonyms || []);
+                    const mustHaveInput = filterRules.must_have_terms.join(', ');
+                    const mustHaveCheck = checkTermsWithLogicInProfile(candidate, mustHaveInput, synonyms || []);
                     
                     if (!mustHaveCheck.found) {
                       stage2Pass = false;
-                      filterReasons.push(`Missing required terms: ${filterRules.must_have_terms.join(', ')}`);
+                      filterReasons.push(`Missing required terms: ${mustHaveInput}`);
                     }
                   }
 
-                  // Enhanced exclude terms check with synonyms  
+                  // Enhanced exclude terms check with logic support
                   if (stage2Pass && filterRules.exclude_terms && filterRules.exclude_terms.length > 0) {
-                    const excludeCheck = checkTermsInProfile(candidate, filterRules.exclude_terms, synonyms || []);
+                    const excludeInput = filterRules.exclude_terms.join(', ');
+                    const excludeCheck = checkTermsWithLogicInProfile(candidate, excludeInput, synonyms || []);
                     
                     if (excludeCheck.found) {
                       stage2Pass = false;

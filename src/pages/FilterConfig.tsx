@@ -73,10 +73,11 @@ const FilterConfig = () => {
             useNotRelevantFilter: filterRules.use_not_relevant_filter || false,
             useTargetCompaniesFilter: filterRules.use_target_companies_filter || false,
             minMonthsCurrentRole: filterRules.min_months_current_role || 0,
-            excludeTerms: (filterRules.exclude_terms || []).join(', '),
+            // Display raw strings to preserve logic syntax
+            excludeTerms: (filterRules.exclude_terms || []).join(''),
             excludeLocationTerms: (filterRules.exclude_location_terms || []).join('\n'),
-            mustHaveTerms: (filterRules.must_have_terms || []).join(', '),
-            requiredTitles: (filterRules.required_titles || []).join(', '),
+            mustHaveTerms: (filterRules.must_have_terms || []).join(''),
+            requiredTitles: (filterRules.required_titles || []).join(''),
             requireTopUni: filterRules.require_top_uni || false,
           });
 
@@ -151,10 +152,11 @@ const FilterConfig = () => {
           use_target_companies_filter: config.useTargetCompaniesFilter,
           // Stage 2 settings
           min_months_current_role: config.minMonthsCurrentRole,
-          exclude_terms: config.excludeTerms.split(',').map(t => t.trim()).filter(Boolean),
+          // Store raw input strings to preserve logic syntax
+          exclude_terms: config.excludeTerms.trim() ? [config.excludeTerms.trim()] : [],
           exclude_location_terms: config.excludeLocationTerms.split('\n').map(t => t.trim()).filter(Boolean),
-          must_have_terms: config.mustHaveTerms.split(',').map(t => t.trim()).filter(Boolean),
-          required_titles: config.requiredTitles.split(',').map(t => t.trim()).filter(Boolean),
+          must_have_terms: config.mustHaveTerms.trim() ? [config.mustHaveTerms.trim()] : [],
+          required_titles: config.requiredTitles.trim() ? [config.requiredTitles.trim()] : [],
           require_top_uni: config.requireTopUni,
         }, { onConflict: 'user_id,job_id' });
 
@@ -396,39 +398,54 @@ const FilterConfig = () => {
                   <Label htmlFor="excludeTerms">Exclude List</Label>
                   <Textarea
                     id="excludeTerms"
-                    placeholder="intern, junior, assistant (comma-separated)"
+                    placeholder="intern OR junior, assistant AND entry"
                     value={config.excludeTerms}
                     onChange={(e) => setConfig({...config, excludeTerms: e.target.value})}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Filter out candidates with these terms in current title (includes synonyms)
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Supports AND/OR logic for exclusions (includes synonyms)</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li><code>intern OR junior</code> - exclude if either term found</li>
+                      <li><code>assistant AND entry</code> - exclude only if both terms found</li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="mustHave">Must Have List</Label>
                   <Textarea
                     id="mustHave"
-                    placeholder="senior, manager, lead (comma-separated)"
+                    placeholder="node AND react, typescript OR javascript, (senior AND manager) OR lead"
+                    rows={3}
                     value={config.mustHaveTerms}
                     onChange={(e) => setConfig({...config, mustHaveTerms: e.target.value})}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Candidates must have at least one of these terms (includes synonyms)
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Supports AND/OR logic. Examples:</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li><code>node AND react</code> - both skills required</li>
+                      <li><code>typescript OR javascript</code> - either skill acceptable</li>
+                      <li><code>senior, manager</code> - comma = OR (backward compatible)</li>
+                      <li><code>(node AND react) OR python</code> - complex logic with grouping</li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="titles">Title Check</Label>
                   <Textarea
                     id="titles"
-                    placeholder="Product Manager, Technical Lead (comma-separated)"
+                    placeholder="Product Manager AND Senior, Technical Lead OR Engineering Manager"
                     value={config.requiredTitles}
                     onChange={(e) => setConfig({...config, requiredTitles: e.target.value})}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Required job titles (includes synonyms)
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Supports AND/OR logic for title requirements</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li><code>Product Manager AND Senior</code> - must contain both terms</li>
+                      <li><code>Technical Lead OR Engineering Manager</code> - either title acceptable</li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
