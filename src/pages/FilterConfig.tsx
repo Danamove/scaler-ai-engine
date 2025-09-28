@@ -165,33 +165,43 @@ const FilterConfig = () => {
       // Save blacklist companies if provided
       if (blacklistCompanies.trim()) {
         const companies = blacklistCompanies.split('\n').map(c => c.trim()).filter(Boolean);
-        const blacklistData = companies.map(company => ({
-          user_id: user.id,
-          job_id: config.jobTitle,
-          company_name: company,
-        }));
+        // Remove duplicates to prevent "cannot affect row a second time" error
+        const uniqueCompanies = [...new Set(companies)].filter(company => company.length > 0);
+        
+        if (uniqueCompanies.length > 0) {
+          const blacklistData = uniqueCompanies.map(company => ({
+            user_id: user.id,
+            job_id: config.jobTitle,
+            company_name: company,
+          }));
 
-        const { error: blacklistError } = await supabase
-          .from('user_blacklist')
-          .upsert(blacklistData, { onConflict: 'user_id,job_id,company_name' });
+          const { error: blacklistError } = await supabase
+            .from('user_blacklist')
+            .upsert(blacklistData, { onConflict: 'user_id,job_id,company_name' });
 
-        if (blacklistError) throw blacklistError;
+          if (blacklistError) throw blacklistError;
+        }
       }
 
       // Save past candidates if provided
       if (pastCandidates.trim()) {
         const candidates = pastCandidates.split('\n').map(c => c.trim()).filter(Boolean);
-        const candidatesData = candidates.map(candidate => ({
-          user_id: user.id,
-          job_id: config.jobTitle,
-          candidate_name: candidate,
-        }));
+        // Remove duplicates to prevent "cannot affect row a second time" error
+        const uniqueCandidates = [...new Set(candidates)].filter(candidate => candidate.length > 0);
+        
+        if (uniqueCandidates.length > 0) {
+          const candidatesData = uniqueCandidates.map(candidate => ({
+            user_id: user.id,
+            job_id: config.jobTitle,
+            candidate_name: candidate,
+          }));
 
-        const { error: candidatesError } = await supabase
-          .from('user_past_candidates')
-          .upsert(candidatesData, { onConflict: 'user_id,job_id,candidate_name' });
+          const { error: candidatesError } = await supabase
+            .from('user_past_candidates')
+            .upsert(candidatesData, { onConflict: 'user_id,job_id,candidate_name' });
 
-        if (candidatesError) throw candidatesError;
+          if (candidatesError) throw candidatesError;
+        }
       }
 
       toast({
