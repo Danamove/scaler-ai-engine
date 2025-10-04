@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck, Zap } from 'lucide-react';
+import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck, Zap, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
@@ -43,6 +43,14 @@ interface ApiCost {
   created_at: string;
 }
 
+interface AllowedEmail {
+  id: string;
+  email: string;
+  added_by?: string;
+  notes?: string;
+  created_at: string;
+}
+
 const AdminPanel = () => {
   const { user, loading } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -57,6 +65,7 @@ const AdminPanel = () => {
   const [topUniversities, setTopUniversities] = useState<TopUniversity[]>([]);
   const [apiCosts, setApiCosts] = useState<ApiCost[]>([]);
   const [userProfiles, setUserProfiles] = useState<any[]>([]);
+  const [allowedEmails, setAllowedEmails] = useState<AllowedEmail[]>([]);
   
   // Form states
   const [newTargetCompany, setNewTargetCompany] = useState({ name: '', category: '' });
@@ -65,6 +74,7 @@ const AdminPanel = () => {
   const [newTopUniversity, setNewTopUniversity] = useState({ name: '', country: 'Israel' });
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
+  const [newAllowedEmail, setNewAllowedEmail] = useState({ email: '', notes: '' });
   
   const [isLoading, setIsLoading] = useState(false);
 
@@ -90,13 +100,14 @@ const AdminPanel = () => {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [targetResponse, notRelevantResponse, synonymsResponse, universitiesResponse, costsResponse, profilesResponse] = await Promise.all([
+      const [targetResponse, notRelevantResponse, synonymsResponse, universitiesResponse, costsResponse, profilesResponse, allowedEmailsResponse] = await Promise.all([
         supabase.from('target_companies').select('*').order('company_name'),
         supabase.from('not_relevant_companies').select('*').order('company_name'),
         supabase.from('synonyms').select('*').order('canonical_term'),
         supabase.from('top_universities').select('*').order('university_name'),
         supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*').order('email')
+        supabase.from('profiles').select('*').order('email'),
+        supabase.from('allowed_emails').select('*').order('email')
       ]);
 
       if (targetResponse.data) setTargetCompanies(targetResponse.data);
@@ -105,6 +116,7 @@ const AdminPanel = () => {
       if (universitiesResponse.data) setTopUniversities(universitiesResponse.data);
       if (costsResponse.data) setApiCosts(costsResponse.data);
       if (profilesResponse.data) setUserProfiles(profilesResponse.data);
+      if (allowedEmailsResponse.data) setAllowedEmails(allowedEmailsResponse.data);
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -356,6 +368,82 @@ const AdminPanel = () => {
     }
   };
 
+  // Allowed Emails Management
+  const addAllowedEmail = async () => {
+    if (!newAllowedEmail.email.trim()) return;
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newAllowedEmail.email.trim())) {
+      toast({
+        title: "Invalid email format",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('allowed_emails')
+        .insert({ 
+          email: newAllowedEmail.email.trim().toLowerCase(),
+          notes: newAllowedEmail.notes.trim() || null,
+          added_by: user?.id
+        });
+
+      if (error) throw error;
+
+      setNewAllowedEmail({ email: '', notes: '' });
+      loadAllData();
+      toast({
+        title: "Email added",
+        description: `${newAllowedEmail.email} is now authorized to register`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error adding email",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAllowedEmail = async (id: string, email: string) => {
+    // Prevent deleting your own admin email
+    if (email.toLowerCase() === user?.email?.toLowerCase()) {
+      toast({
+        title: "Cannot delete your own email",
+        description: "You cannot remove your own admin access",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to remove "${email}" from allowed emails?`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from('allowed_emails')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      loadAllData();
+      toast({
+        title: "Email removed",
+        description: `${email} is no longer authorized to register`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error deleting email",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Seed recommended synonyms
   const seedRecommendedSynonyms = async () => {
     const recommendedSynonyms = [
@@ -482,11 +570,12 @@ const AdminPanel = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="target-companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="target-companies">Target Companies</TabsTrigger>
             <TabsTrigger value="not-relevant">NotRelevant Companies</TabsTrigger>
             <TabsTrigger value="synonyms">Synonyms</TabsTrigger>
             <TabsTrigger value="top-universities">Top Universities</TabsTrigger>
+            <TabsTrigger value="allowed-emails">Allowed Emails</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="impersonate">User Access</TabsTrigger>
             <TabsTrigger value="api-costs">API Costs</TabsTrigger>
@@ -784,6 +873,73 @@ const AdminPanel = () => {
                           variant="destructive"
                           size="sm"
                           onClick={() => deleteTopUniversity(university.id, university.university_name)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Allowed Emails Tab */}
+          <TabsContent value="allowed-emails" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Allowed Emails Management
+                </CardTitle>
+                <CardDescription>
+                  Manage which email addresses are authorized to register for Scaler
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="allowed-email">Email Address</Label>
+                    <Input
+                      id="allowed-email"
+                      type="email"
+                      value={newAllowedEmail.email}
+                      onChange={(e) => setNewAllowedEmail(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="user@company.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email-notes">Notes (Optional)</Label>
+                    <Input
+                      id="email-notes"
+                      value={newAllowedEmail.notes}
+                      onChange={(e) => setNewAllowedEmail(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="e.g., Sales team member"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={addAllowedEmail} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Email
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Current Allowed Emails ({allowedEmails.length})</h4>
+                  <div className="max-h-96 overflow-y-auto space-y-2">
+                    {allowedEmails.map((emailEntry) => (
+                      <div key={emailEntry.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <span className="font-medium">{emailEntry.email}</span>
+                          {emailEntry.notes && <Badge variant="outline" className="ml-2">{emailEntry.notes}</Badge>}
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteAllowedEmail(emailEntry.id, emailEntry.email)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

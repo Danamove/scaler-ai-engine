@@ -100,6 +100,27 @@ const [resetSuccess, setResetSuccess] = useState(false);
 
     try {
       const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Check if email is in allowed_emails table
+      const { data: allowedEmail, error: checkError } = await supabase
+        .from('allowed_emails')
+        .select('email')
+        .eq('email', formData.email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking allowed emails:', checkError);
+        setErrors({ general: 'Unable to verify email authorization. Please try again.' });
+        setLoading(false);
+        return;
+      }
+
+      if (!allowedEmail) {
+        setErrors({ general: 'This email is not authorized to register. Please contact your administrator.' });
+        setLoading(false);
+        return;
+      }
+
       const redirectUrl = `${window.location.origin}/auth`;
 
       const { error } = await supabase.auth.signInWithOtp({
