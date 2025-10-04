@@ -46,12 +46,66 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication first
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration');
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use authenticated user ID instead of accepting it from request
+    const userId = user.id;
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not found');
     }
 
-    const { candidate, filterRules, userId, synonyms = [] } = await req.json();
+    const { candidate, filterRules, synonyms = [] } = await req.json();
+
+    // Input validation
+    if (!candidate || typeof candidate !== 'object') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid candidate data' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize and validate string fields
+    const sanitize = (str: string | undefined, maxLength: number): string => {
+      if (!str) return '';
+      return str.slice(0, maxLength).replace(/[\x00-\x1F\x7F]/g, '');
+    };
+
+    candidate.current_title = sanitize(candidate.current_title, 200);
+    candidate.current_company = sanitize(candidate.current_company, 200);
+    candidate.previous_company = sanitize(candidate.previous_company, 200);
+    candidate.profile_summary = sanitize(candidate.profile_summary, 5000);
+    candidate.education = sanitize(candidate.education, 1000);
+    candidate.full_name = sanitize(candidate.full_name, 200);
     console.log('Analyzing candidate:', candidate.current_title);
 
     // Create comprehensive text for analysis

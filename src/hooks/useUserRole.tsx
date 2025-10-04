@@ -30,8 +30,9 @@ export const useUserRole = (): UseUserRoleReturn => {
       setLoading(true);
       setError(null);
 
+      // Query user_roles table instead of profiles for security
       const { data, error: roleError } = await supabase
-        .from('profiles')
+        .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .maybeSingle();

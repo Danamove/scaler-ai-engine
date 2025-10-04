@@ -101,12 +101,9 @@ const [resetSuccess, setResetSuccess] = useState(false);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Check if email is in allowed_emails table
-      const { data: allowedEmail, error: checkError } = await supabase
-        .from('allowed_emails')
-        .select('email')
-        .eq('email', formData.email.trim().toLowerCase())
-        .maybeSingle();
+      // Use secure function to check if email is allowed (doesn't expose email list)
+      const { data: isAllowed, error: checkError } = await supabase
+        .rpc('is_email_allowed', { check_email: formData.email.trim() });
 
       if (checkError) {
         console.error('Error checking allowed emails:', checkError);
@@ -115,7 +112,7 @@ const [resetSuccess, setResetSuccess] = useState(false);
         return;
       }
 
-      if (!allowedEmail) {
+      if (!isAllowed) {
         setErrors({ general: 'This email is not authorized to register. Please contact your administrator.' });
         setLoading(false);
         return;

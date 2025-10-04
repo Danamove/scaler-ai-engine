@@ -72,8 +72,42 @@ serve(async (req) => {
   }
 
   try {
-    const { candidates, filterRules, userId, synonyms = [] } = await req.json();
+    // Verify authentication first
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration');
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use authenticated user ID instead of accepting it from request
+    const userId = user.id;
+
+    const { candidates, filterRules, synonyms = [] } = await req.json();
+
+    // Input validation
     if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Candidates array is required' }),
@@ -81,12 +115,35 @@ serve(async (req) => {
       );
     }
 
-    if (!filterRules || !userId) {
+    // Limit batch size to prevent abuse
+    if (candidates.length > 100) {
       return new Response(
-        JSON.stringify({ error: 'FilterRules and userId are required' }),
+        JSON.stringify({ error: 'Maximum 100 candidates per batch allowed' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    if (!filterRules) {
+      return new Response(
+        JSON.stringify({ error: 'FilterRules are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Sanitize candidate data
+    const sanitize = (str: string | undefined, maxLength: number): string => {
+      if (!str) return '';
+      return str.slice(0, maxLength).replace(/[\x00-\x1F\x7F]/g, '');
+    };
+
+    candidates.forEach(candidate => {
+      candidate.current_title = sanitize(candidate.current_title, 200);
+      candidate.current_company = sanitize(candidate.current_company, 200);
+      candidate.previous_company = sanitize(candidate.previous_company, 200);
+      candidate.profile_summary = sanitize(candidate.profile_summary, 5000);
+      candidate.education = sanitize(candidate.education, 1000);
+      candidate.full_name = sanitize(candidate.full_name, 200);
+    });
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
@@ -96,7 +153,6 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
