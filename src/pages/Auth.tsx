@@ -101,9 +101,12 @@ const [resetSuccess, setResetSuccess] = useState(false);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
+      // Normalize email to match database format
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      
       // Use secure function to check if email is allowed (doesn't expose email list)
       const { data: isAllowed, error: checkError } = await supabase
-        .rpc('is_email_allowed', { check_email: formData.email.trim() });
+        .rpc('is_email_allowed', { check_email: normalizedEmail });
 
       if (checkError) {
         console.error('Error checking allowed emails:', checkError);
@@ -121,7 +124,7 @@ const [resetSuccess, setResetSuccess] = useState(false);
       const redirectUrl = `${window.location.origin}/auth`;
 
       const { error } = await supabase.auth.signInWithOtp({
-        email: formData.email,
+        email: normalizedEmail,
         options: {
           emailRedirectTo: redirectUrl,
           shouldCreateUser: true,
