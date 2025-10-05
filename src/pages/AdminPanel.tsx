@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck, Zap, Mail } from 'lucide-react';
+import { Filter, Building2, Users, BookOpen, Key, Plus, Trash2, ArrowLeft, DollarSign, UserCheck, Zap, Mail, Edit2, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
@@ -75,6 +75,9 @@ const AdminPanel = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newApiKey, setNewApiKey] = useState('');
   const [newAllowedEmail, setNewAllowedEmail] = useState({ email: '', notes: '' });
+  const [isAddingEmail, setIsAddingEmail] = useState(false);
+  const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
+  const [editingEmailData, setEditingEmailData] = useState({ email: '', notes: '' });
   
   const [isLoading, setIsLoading] = useState(false);
 
@@ -383,11 +386,38 @@ const AdminPanel = () => {
       return;
     }
     
+    setIsAddingEmail(true);
+    
     try {
+      const normalizedEmail = newAllowedEmail.email.trim().toLowerCase();
+      
+      // Check if email already exists
+      const { data: existingEmails } = await supabase
+        .from('allowed_emails')
+        .select('id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle();
+      
+      if (existingEmails) {
+        toast({
+          title: "Email already exists",
+          description: `${normalizedEmail} is already in the allowed list. You can edit it below.`,
+          variant: "destructive",
+        });
+        // Highlight the existing email for editing
+        setEditingEmailId(existingEmails.id);
+        const emailToEdit = allowedEmails.find(e => e.id === existingEmails.id);
+        if (emailToEdit) {
+          setEditingEmailData({ email: emailToEdit.email, notes: emailToEdit.notes || '' });
+        }
+        setIsAddingEmail(false);
+        return;
+      }
+      
       const { error } = await supabase
         .from('allowed_emails')
         .insert({ 
-          email: newAllowedEmail.email.trim().toLowerCase(),
+          email: normalizedEmail,
           notes: newAllowedEmail.notes.trim() || null,
           added_by: user?.id
         });
@@ -398,11 +428,90 @@ const AdminPanel = () => {
       loadAllData();
       toast({
         title: "Email added",
-        description: `${newAllowedEmail.email} is now authorized to register`,
+        description: `${normalizedEmail} is now authorized to register`,
       });
     } catch (error: any) {
       toast({
         title: "Error adding email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingEmail(false);
+    }
+  };
+
+  const startEditingEmail = (emailEntry: AllowedEmail) => {
+    setEditingEmailId(emailEntry.id);
+    setEditingEmailData({ email: emailEntry.email, notes: emailEntry.notes || '' });
+  };
+
+  const cancelEditingEmail = () => {
+    setEditingEmailId(null);
+    setEditingEmailData({ email: '', notes: '' });
+  };
+
+  const saveEditedEmail = async (id: string) => {
+    if (!editingEmailData.email.trim()) {
+      toast({
+        title: "Email required",
+        description: "Email address cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editingEmailData.email.trim())) {
+      toast({
+        title: "Invalid email format",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const normalizedEmail = editingEmailData.email.trim().toLowerCase();
+      
+      // Check if the new email already exists (excluding current record)
+      const { data: existingEmails } = await supabase
+        .from('allowed_emails')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .neq('id', id)
+        .maybeSingle();
+      
+      if (existingEmails) {
+        toast({
+          title: "Email already exists",
+          description: `${normalizedEmail} is already in the allowed list`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('allowed_emails')
+        .update({ 
+          email: normalizedEmail,
+          notes: editingEmailData.notes.trim() || null
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setEditingEmailId(null);
+      setEditingEmailData({ email: '', notes: '' });
+      loadAllData();
+      toast({
+        title: "Email updated",
+        description: `Email updated successfully to ${normalizedEmail}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error updating email",
         description: error.message,
         variant: "destructive",
       });
@@ -918,9 +1027,18 @@ const AdminPanel = () => {
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button onClick={addAllowedEmail} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Email
+                    <Button onClick={addAllowedEmail} className="w-full" disabled={isAddingEmail}>
+                      {isAddingEmail ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Email
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -930,21 +1048,100 @@ const AdminPanel = () => {
                 <div className="space-y-2">
                   <h4 className="font-medium">Current Allowed Emails ({allowedEmails.length})</h4>
                   <div className="max-h-96 overflow-y-auto space-y-2">
-                    {allowedEmails.map((emailEntry) => (
-                      <div key={emailEntry.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div>
-                          <span className="font-medium">{emailEntry.email}</span>
-                          {emailEntry.notes && <Badge variant="outline" className="ml-2">{emailEntry.notes}</Badge>}
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteAllowedEmail(emailEntry.id, emailEntry.email)}
+                    {allowedEmails.map((emailEntry) => {
+                      const isEditing = editingEmailId === emailEntry.id;
+                      
+                      return (
+                        <div 
+                          key={emailEntry.id} 
+                          className={`p-3 rounded-lg transition-colors ${
+                            isEditing ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/50'
+                          }`}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                          {isEditing ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs">Email Address</Label>
+                                  <Input
+                                    type="email"
+                                    value={editingEmailData.email}
+                                    onChange={(e) => setEditingEmailData(prev => ({ ...prev, email: e.target.value }))}
+                                    className="h-9"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Escape') {
+                                        cancelEditingEmail();
+                                      } else if (e.key === 'Enter') {
+                                        saveEditedEmail(emailEntry.id);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Notes (Optional)</Label>
+                                  <Input
+                                    value={editingEmailData.notes}
+                                    onChange={(e) => setEditingEmailData(prev => ({ ...prev, notes: e.target.value }))}
+                                    className="h-9"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Escape') {
+                                        cancelEditingEmail();
+                                      } else if (e.key === 'Enter') {
+                                        saveEditedEmail(emailEntry.id);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={cancelEditingEmail}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => saveEditedEmail(emailEntry.id)}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Save
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Press ESC to cancel or Enter to save
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-medium">{emailEntry.email}</span>
+                                {emailEntry.notes && <Badge variant="outline" className="ml-2">{emailEntry.notes}</Badge>}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => startEditingEmail(emailEntry)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteAllowedEmail(emailEntry.id, emailEntry.email)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
