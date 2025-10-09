@@ -148,26 +148,47 @@ const Results = () => {
     }
   };
 
-  const exportToCSV = (data: CandidateResult[], filename: string) => {
-    const headers = [
-      'Full Name',
-      'Current Title', 
-      'Current Company',
-      'Previous Company',
-      'LinkedIn URL',
-      'Profile Summary'
-    ];
+  const exportToCSV = (data: CandidateResult[], filename: string, includeRejectionReasons: boolean = false) => {
+    const headers = includeRejectionReasons
+      ? [
+          'Full Name',
+          'Current Title', 
+          'Current Company',
+          'Previous Company',
+          'LinkedIn URL',
+          'Profile Summary',
+          'Rejection Reasons'
+        ]
+      : [
+          'Full Name',
+          'Current Title', 
+          'Current Company',
+          'Previous Company',
+          'LinkedIn URL',
+          'Profile Summary'
+        ];
 
     const csvContent = [
       headers.join(','),
-      ...data.map(row => [
-        `"${row.full_name}"`,
-        `"${row.current_title}"`,
-        `"${row.current_company}"`,
-        `"${row.previous_company}"`,
-        `"${row.linkedin_url}"`,
-        `"${row.profile_summary.substring(0, 100)}..."` // Truncate long summaries
-      ].join(','))
+      ...data.map(row => {
+        const baseData = [
+          `"${row.full_name}"`,
+          `"${row.current_title}"`,
+          `"${row.current_company}"`,
+          `"${row.previous_company}"`,
+          `"${row.linkedin_url}"`,
+          `"${row.profile_summary.substring(0, 100)}..."`
+        ];
+        
+        if (includeRejectionReasons) {
+          const reasons = row.filter_reasons && row.filter_reasons.length > 0 
+            ? row.filter_reasons.join('; ') 
+            : 'No specific reason';
+          baseData.push(`"${reasons}"`);
+        }
+        
+        return baseData.join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -229,12 +250,13 @@ const Results = () => {
     }
   };
 
-  const handleExport = async (stage: 'stage1' | 'stage2' | 'final') => {
+  const handleExport = async (stage: 'stage1' | 'stage2' | 'final' | 'rejected') => {
     setExporting(true);
 
     try {
       let dataToExport: CandidateResult[] = [];
       let filename = '';
+      let includeRejectionReasons = false;
       
       switch (stage) {
         case 'stage1':
@@ -249,9 +271,14 @@ const Results = () => {
           dataToExport = results.filter(r => r.stage_1_passed && r.stage_2_passed);
           filename = 'final_results.csv';
           break;
+        case 'rejected':
+          dataToExport = results.filter(r => !r.stage_1_passed || !r.stage_2_passed);
+          filename = 'rejected_candidates.csv';
+          includeRejectionReasons = true;
+          break;
       }
 
-      exportToCSV(dataToExport, filename);
+      exportToCSV(dataToExport, filename, includeRejectionReasons);
 
       toast({
         title: "Export Successful",
@@ -523,6 +550,15 @@ const Results = () => {
                     <Download className="h-4 w-4" />
                     Export Final
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleExport('rejected')}
+                    disabled={exporting || (stats.total_candidates - stats.final_results) === 0}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Rejected
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -614,6 +650,15 @@ const Results = () => {
                     <p className="text-sm text-muted-foreground">
                       Candidates who were rejected during the filtering process
                     </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleExport('rejected')}
+                      disabled={exporting || (stats.total_candidates - stats.final_results) === 0}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export Rejected
+                    </Button>
                   </div>
                   
                   {/* Rejection Reason Filter */}
