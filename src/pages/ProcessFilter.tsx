@@ -305,6 +305,12 @@ const ProcessFilter = () => {
         .eq('user_id', getActiveUserId())
         .eq('job_id', filterRules.job_id);
 
+      const { data: wantedCompanies } = await supabase
+        .from('user_wanted_companies')
+        .select('company_name')
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', filterRules.job_id);
+
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
@@ -316,6 +322,7 @@ const ProcessFilter = () => {
         notRelevantCompanies: notRelevantCompanies?.length || 0,
         targetCompanies: targetCompanies?.length || 0,
         blacklistCompanies: blacklistCompanies?.length || 0,
+        wantedCompanies: wantedCompanies?.length || 0,
         pastCandidates: pastCandidates?.length || 0
       });
 
@@ -392,7 +399,62 @@ const ProcessFilter = () => {
           }
         }
 
-        // Target companies check moved to Stage 2
+        // Check wanted companies + target companies (combined logic)
+        if (stage1Pass) {
+          const userWantedList = wantedCompanies?.map(w => w.company_name) || [];
+          const combinedWantedList = [...userWantedList];
+          
+          // Add target companies ONLY if the filter is enabled AND user has wanted companies
+          if (filterRules.use_target_companies_filter && userWantedList.length > 0) {
+            const targetList = targetCompanies?.map(t => t.company_name) || [];
+            combinedWantedList.push(...targetList);
+          }
+          
+          // If user has wanted companies (with or without target), filter by combined list
+          if (userWantedList.length > 0) {
+            const currentCompany = candidate.current_company || '';
+            const previousCompany = candidate.previous_company || '';
+            
+            let matchFound = false;
+            
+            for (const wantedCompany of combinedWantedList) {
+              if (isCompanyMatch(currentCompany, wantedCompany) || 
+                  isCompanyMatch(previousCompany, wantedCompany)) {
+                matchFound = true;
+                break;
+              }
+            }
+            
+            if (!matchFound) {
+              stage1Pass = false;
+              filterReasons.push('Not in wanted companies list');
+              console.log(`Wanted companies check failed - Candidate: ${candidate.full_name}, Current: ${currentCompany}, Previous: ${previousCompany}`);
+            }
+          }
+          // If no user wanted companies but target filter is ON, use original target logic
+          else if (filterRules.use_target_companies_filter) {
+            const targetList = targetCompanies?.map(t => t.company_name) || [];
+            if (targetList.length > 0) {
+              const currentCompany = candidate.current_company || '';
+              const previousCompany = candidate.previous_company || '';
+              
+              let isFromTargetCompany = false;
+              
+              for (const targetCompany of targetList) {
+                if (isCompanyMatch(currentCompany, targetCompany) || 
+                    isCompanyMatch(previousCompany, targetCompany)) {
+                  isFromTargetCompany = true;
+                  break;
+                }
+              }
+              
+              if (!isFromTargetCompany) {
+                stage1Pass = false;
+                filterReasons.push('Not from target company');
+              }
+            }
+          }
+        }
 
         if (stage1Pass) {
           stage1Passed++;

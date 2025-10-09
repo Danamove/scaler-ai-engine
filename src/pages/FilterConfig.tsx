@@ -35,6 +35,7 @@ const FilterConfig = () => {
   });
   
   const [blacklistCompanies, setBlacklistCompanies] = useState('');
+  const [wantedCompanies, setWantedCompanies] = useState('');
   const [pastCandidates, setPastCandidates] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -90,6 +91,17 @@ const FilterConfig = () => {
           
           if (blacklist?.length) {
             setBlacklistCompanies(blacklist.map(b => b.company_name).join('\n'));
+          }
+
+          // Load wanted companies for this job
+          const { data: wanted } = await supabase
+            .from('user_wanted_companies')
+            .select('company_name')
+            .eq('user_id', user.id)
+            .eq('job_id', filterRules.job_id);
+          
+          if (wanted?.length) {
+            setWantedCompanies(wanted.map(w => w.company_name).join('\n'));
           }
 
           // Load past candidates for this job
@@ -180,6 +192,26 @@ const FilterConfig = () => {
             .upsert(blacklistData, { onConflict: 'user_id,job_id,company_name' });
 
           if (blacklistError) throw blacklistError;
+        }
+      }
+
+      // Save wanted companies if provided
+      if (wantedCompanies.trim()) {
+        const companies = wantedCompanies.split('\n').map(c => c.trim()).filter(Boolean);
+        const uniqueCompanies = [...new Set(companies)].filter(company => company.length > 0);
+        
+        if (uniqueCompanies.length > 0) {
+          const wantedData = uniqueCompanies.map(company => ({
+            user_id: user.id,
+            job_id: config.jobTitle,
+            company_name: company,
+          }));
+
+          const { error: wantedError } = await supabase
+            .from('user_wanted_companies')
+            .upsert(wantedData, { onConflict: 'user_id,job_id,company_name' });
+
+          if (wantedError) throw wantedError;
         }
       }
 
@@ -349,6 +381,22 @@ const FilterConfig = () => {
                     </p>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="wantedCompanies">Wanted Companies</Label>
+                    <Textarea
+                      id="wantedCompanies"
+                      placeholder="Company Name 1&#10;Company Name 2&#10;Company Name 3"
+                      rows={6}
+                      value={wantedCompanies}
+                      onChange={(e) => setWantedCompanies(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      One company per line. If filled, combined with Target Companies filter (if enabled). Shows candidates from <strong>wanted list + target companies</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-1 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="pastCandidates">Past Candidates</Label>
                     <Textarea

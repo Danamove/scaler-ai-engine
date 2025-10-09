@@ -121,6 +121,7 @@ export const useJobManager = () => {
         supabase.from('filtered_results').delete().eq('user_id', activeUserId).eq('job_id', jobId),
         supabase.from('filter_rules').delete().eq('user_id', activeUserId).eq('job_id', jobId),
         supabase.from('user_blacklist').delete().eq('user_id', activeUserId).eq('job_id', jobId),
+        supabase.from('user_wanted_companies').delete().eq('user_id', activeUserId).eq('job_id', jobId),
         supabase.from('user_past_candidates').delete().eq('user_id', activeUserId).eq('job_id', jobId),
         supabase.from('netly_files').delete().eq('user_id', activeUserId).eq('job_id', jobId)
       ]);
