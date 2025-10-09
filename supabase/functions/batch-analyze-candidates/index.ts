@@ -16,6 +16,10 @@ interface CandidateProfile {
   linkedin_url?: string;
   profile_summary?: string;
   education?: string;
+  location?: string;
+  skills?: string;
+  job_description?: string;
+  degree?: string;
   years_of_experience?: number;
   months_in_current_role?: number;
 }
@@ -182,12 +186,8 @@ serve(async (req) => {
 
     // Function to extract location from candidate profile
     const extractCandidateLocation = (candidate: CandidateProfile): string => {
-      const locationSources = [
-        candidate.education || '',
-        candidate.profile_summary || '',
-        candidate.current_company || ''
-      ];
-      return locationSources.join(' ').toLowerCase();
+      // ONLY use the dedicated location field if it exists
+      return (candidate.location || '').toLowerCase().trim();
     };
 
     // Function to check if candidate should be excluded based on location
@@ -196,21 +196,15 @@ serve(async (req) => {
       
       const candidateLocation = extractCandidateLocation(candidate);
       
+      // If no location data available, don't exclude
+      if (!candidateLocation) return false;
+      
       return excludeLocationTerms.some(excludeTerm => {
         const term = excludeTerm.toLowerCase().trim();
         if (!term) return false;
         
-        // Check if the exclude term is a known Israeli location
-        const isLocationTerm = israeliLocations.some(location => 
-          location.toLowerCase().includes(term) || term.includes(location.toLowerCase())
-        );
-        
-        if (isLocationTerm) {
-          // Only check against candidate's location if it's a location term
-          return candidateLocation.includes(term);
-        }
-        
-        return false; // If not a location term, don't exclude based on location
+        // Check if the exclude term appears in the candidate's location
+        return candidateLocation.includes(term);
       });
     };
 
@@ -236,7 +230,7 @@ serve(async (req) => {
       };
 
       const candidatesData = candidates.map((candidate, index) => {
-        return `${index + 1}. ID:${candidate.id} Name:${candidate.full_name} Title:${candidate.current_title || 'N/A'} Company:${candidate.current_company || 'N/A'} Exp:${candidate.years_of_experience || 'N/A'}y Role:${candidate.months_in_current_role || 'N/A'}m Edu:${candidate.education || 'N/A'} Summary:${(candidate.profile_summary || '').substring(0, 200)}`;
+        return `${index + 1}. ID:${candidate.id} Name:${candidate.full_name} Title:${candidate.current_title || 'N/A'} Company:${candidate.current_company || 'N/A'} Location:${candidate.location || 'N/A'} Skills:${(candidate.skills || '').substring(0, 150)} Degree:${candidate.degree || 'N/A'} Exp:${candidate.years_of_experience || 'N/A'}y Role:${candidate.months_in_current_role || 'N/A'}m Edu:${candidate.education || 'N/A'} Summary:${(candidate.profile_summary || '').substring(0, 150)}`;
       }).join('\n');
 
       const parseLogicTerms = (terms: string[]): string => {
@@ -282,7 +276,7 @@ IMPORTANT: For location exclusion - only check ExcludeLocation terms against can
             messages: [
               {
                 role: 'system',
-                 content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal.
+                 content: `You are an expert candidate screener. Analyze each candidate and return a JSON array with analysis results. Score 1-10 for each category. Use synonyms: engineer=developer, backend=server-side, frontend=client-side, senior=lead/principal, MSc=Master=תואר שני.
 
 LOGIC SUPPORT: When you see "LOGIC:" in rules, interpret AND/OR operators:
 - "node AND react" means BOTH terms must be present
@@ -290,7 +284,9 @@ LOGIC SUPPORT: When you see "LOGIC:" in rules, interpret AND/OR operators:
 - "(senior AND manager) OR lead" means either (both senior AND manager) OR lead
 - Default comma separation = OR logic
 
-CRITICAL: For location exclusion (passes_location_exclusion_check) - ONLY check ExcludeLocation terms against candidate's actual location (education, current company location), NOT against skills, job titles, or other profile content. Location terms should only match location data.
+MUST HAVE TERMS: Check against ALL fields - skills, job description, degree, profile summary, title. For degree-related terms (Master, MSc, תואר שני, PhD), primarily check the Degree field.
+
+CRITICAL: For location exclusion (passes_location_exclusion_check) - ONLY check ExcludeLocation terms against candidate's Location field, NOT against skills, job titles, education, or other profile content. If Location is empty, pass this check automatically.
 
 Return valid JSON only.`
               },

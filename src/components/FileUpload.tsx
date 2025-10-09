@@ -129,16 +129,26 @@ export const FileUpload = ({
           current_company: row.companyName || '',
           previous_company: row.previousCompanyName || '',
           linkedin_url: row.linkedinProfileUrl || '',
+          
+          // Location from CSV
+          location: row.location || row.linkedinJobLocation || '',
+          
+          // Skills as separate field
+          skills: row.linkedinSkillsLabel || row.linkedinSkills || row.skills || '',
+          
+          // Job description
+          job_description: row.linkedinJobDescription || '',
+          
+          // Academic degree
+          degree: row.linkedinSchoolDegree || row.linkedinPreviousSchoolDegree || '',
+          
           profile_summary: [
             row.linkedinDescription || row.profilesummery || '',
-            row.linkedinSkillsLabel || '',
-            row.linkedinSkills || '',
-            row.skills || '',
             row.technologies || '',
             row.expertise || '',
             row.competencies || ''
           ].filter(Boolean).join(' '),
-          education: row.linkedinSchoolName || '',
+          education: row.linkedinSchoolName || row.linkedinPreviousSchoolName || '',
           years_of_experience: getYearsFromDateRange(row.linkedinJobDateRange || ''),
           months_in_current_role: getCurrentRoleMonths(row.linkedinJobDateRange || ''),
         };

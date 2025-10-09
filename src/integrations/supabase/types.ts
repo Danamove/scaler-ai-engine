@@ -288,14 +288,18 @@ export type Database = {
           created_at: string
           current_company: string | null
           current_title: string | null
+          degree: string | null
           education: string | null
           full_name: string
           id: string
+          job_description: string | null
           job_id: string
           linkedin_url: string | null
+          location: string | null
           months_in_current_role: number | null
           previous_company: string | null
           profile_summary: string | null
+          skills: string | null
           user_id: string
           years_of_experience: number | null
         }
@@ -303,14 +307,18 @@ export type Database = {
           created_at?: string
           current_company?: string | null
           current_title?: string | null
+          degree?: string | null
           education?: string | null
           full_name: string
           id?: string
+          job_description?: string | null
           job_id: string
           linkedin_url?: string | null
+          location?: string | null
           months_in_current_role?: number | null
           previous_company?: string | null
           profile_summary?: string | null
+          skills?: string | null
           user_id: string
           years_of_experience?: number | null
         }
@@ -318,14 +326,18 @@ export type Database = {
           created_at?: string
           current_company?: string | null
           current_title?: string | null
+          degree?: string | null
           education?: string | null
           full_name?: string
           id?: string
+          job_description?: string | null
           job_id?: string
           linkedin_url?: string | null
+          location?: string | null
           months_in_current_role?: number | null
           previous_company?: string | null
           profile_summary?: string | null
+          skills?: string | null
           user_id?: string
           years_of_experience?: number | null
         }

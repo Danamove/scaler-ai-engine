@@ -224,12 +224,14 @@ export const checkTermsWithLogic = (
     candidate.current_title,
     candidate.profile_summary,
     candidate.education,
+    candidate.degree,
+    candidate.job_description,
+    candidate.skills,
     candidate.previous_company,
     candidate.current_company,
-    // Check additional skill fields from raw data
+    // Check additional skill fields from raw data (for backward compatibility)
     candidate.linkedinSkillsLabel,
     candidate.linkedinSkills,
-    candidate.skills,
     candidate.technologies,
     candidate.expertise,
     candidate.competencies
