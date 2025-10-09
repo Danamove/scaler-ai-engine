@@ -70,6 +70,7 @@ const AdminPanel = () => {
   // Form states
   const [newTargetCompany, setNewTargetCompany] = useState({ name: '', category: '' });
   const [newNotRelevantCompany, setNewNotRelevantCompany] = useState({ name: '', category: '' });
+  const [bulkNotRelevantCompanies, setBulkNotRelevantCompanies] = useState('');
   const [newSynonym, setNewSynonym] = useState({ canonicalTerm: '', variantTerm: '', category: 'skill' });
   const [newTopUniversity, setNewTopUniversity] = useState({ name: '', country: 'Israel' });
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -236,6 +237,90 @@ const AdminPanel = () => {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const addNotRelevantCompaniesBulk = async () => {
+    if (!bulkNotRelevantCompanies.trim()) {
+      toast({
+        title: "Empty list",
+        description: "Please enter at least one company name",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Split by lines, trim each line, remove empty lines
+      const companies = bulkNotRelevantCompanies
+        .split('\n')
+        .map(c => c.trim())
+        .filter(Boolean);
+      
+      // Remove duplicates (case-insensitive)
+      const uniqueCompanies = [...new Set(companies.map(c => c.toLowerCase()))]
+        .map(c => companies.find(orig => orig.toLowerCase() === c))
+        .filter(Boolean) as string[];
+      
+      if (uniqueCompanies.length === 0) {
+        toast({
+          title: "No valid companies",
+          description: "Please enter at least one company name",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check for existing companies
+      const { data: existingCompanies } = await supabase
+        .from('not_relevant_companies')
+        .select('company_name');
+
+      const existingNames = new Set(
+        (existingCompanies || []).map(c => c.company_name.toLowerCase())
+      );
+
+      const companiesToInsert = uniqueCompanies
+        .filter(name => !existingNames.has(name.toLowerCase()))
+        .map(name => ({
+          company_name: name,
+          category: null
+        }));
+
+      if (companiesToInsert.length === 0) {
+        toast({
+          title: "All companies already exist",
+          description: "No new companies to add",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('not_relevant_companies')
+        .insert(companiesToInsert);
+      
+      if (error) throw error;
+      
+      setBulkNotRelevantCompanies('');
+      await loadAllData();
+      
+      toast({
+        title: "Companies added",
+        description: `Successfully added ${companiesToInsert.length} companies to NotRelevant list`,
+      });
+      
+    } catch (error: any) {
+      toast({
+        title: "Error adding companies",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -769,30 +854,76 @@ const AdminPanel = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-4">
+                  {/* Single Company Add */}
                   <div>
-                    <Label htmlFor="not-relevant-company-name">Company Name</Label>
-                    <Input
-                      id="not-relevant-company-name"
-                      value={newNotRelevantCompany.name}
-                      onChange={(e) => setNewNotRelevantCompany(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g., Small Local Company"
-                    />
+                    <h4 className="font-medium mb-3">Add Single Company</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="not-relevant-company-name">Company Name</Label>
+                        <Input
+                          id="not-relevant-company-name"
+                          value={newNotRelevantCompany.name}
+                          onChange={(e) => setNewNotRelevantCompany(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="e.g., Small Local Company"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="not-relevant-company-category">Category (Optional)</Label>
+                        <Input
+                          id="not-relevant-company-category"
+                          value={newNotRelevantCompany.category}
+                          onChange={(e) => setNewNotRelevantCompany(prev => ({ ...prev, category: e.target.value }))}
+                          placeholder="e.g., Retail, Food"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button onClick={addNotRelevantCompany} className="w-full">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Company
+                        </Button>
+                      </div>
+                    </div>
                   </div>
+                  
+                  <Separator />
+                  
+                  {/* Bulk Companies Add */}
                   <div>
-                    <Label htmlFor="not-relevant-company-category">Category (Optional)</Label>
-                    <Input
-                      id="not-relevant-company-category"
-                      value={newNotRelevantCompany.category}
-                      onChange={(e) => setNewNotRelevantCompany(prev => ({ ...prev, category: e.target.value }))}
-                      placeholder="e.g., Retail, Food"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button onClick={addNotRelevantCompany} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Company
-                    </Button>
+                    <h4 className="font-medium mb-3">Add Multiple Companies (Bulk)</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-not-relevant-companies">Paste Company List</Label>
+                      <Textarea
+                        id="bulk-not-relevant-companies"
+                        value={bulkNotRelevantCompanies}
+                        onChange={(e) => setBulkNotRelevantCompanies(e.target.value)}
+                        placeholder="Company Name 1&#10;Company Name 2&#10;Company Name 3&#10;..."
+                        rows={8}
+                        className="font-mono text-sm"
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          One company per line. Duplicates will be removed automatically.
+                        </p>
+                        <Button 
+                          onClick={addNotRelevantCompaniesBulk} 
+                          disabled={isLoading || !bulkNotRelevantCompanies.trim()}
+                          className="ml-2"
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add All Companies
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
