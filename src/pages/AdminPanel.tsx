@@ -106,13 +106,13 @@ const AdminPanel = () => {
     setIsLoading(true);
     try {
       const [targetResponse, notRelevantResponse, synonymsResponse, universitiesResponse, costsResponse, profilesResponse, allowedEmailsResponse] = await Promise.all([
-        supabase.from('target_companies').select('*').order('company_name'),
-        supabase.from('not_relevant_companies').select('*').order('company_name'),
-        supabase.from('synonyms').select('*').order('canonical_term'),
-        supabase.from('top_universities').select('*').order('university_name'),
+        supabase.from('target_companies').select('*').order('company_name').limit(10000),
+        supabase.from('not_relevant_companies').select('*').order('company_name').limit(10000),
+        supabase.from('synonyms').select('*').order('canonical_term').limit(10000),
+        supabase.from('top_universities').select('*').order('university_name').limit(10000),
         supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*').order('email'),
-        supabase.from('allowed_emails').select('*').order('email')
+        supabase.from('profiles').select('*').order('email').limit(10000),
+        supabase.from('allowed_emails').select('*').order('email').limit(10000)
       ]);
 
       if (targetResponse.data) setTargetCompanies(targetResponse.data);
