@@ -51,6 +51,35 @@ interface AllowedEmail {
   created_at: string;
 }
 
+// Helper function to fetch all rows with pagination
+const BATCH_SIZE = 1000;
+
+async function fetchAllRows<T>(table: string, orderBy: string): Promise<T[]> {
+  let from = 0;
+  let to = BATCH_SIZE - 1;
+  const all: T[] = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from(table as any)
+      .select('*')
+      .order(orderBy)
+      .range(from, to);
+
+    if (error) throw error;
+
+    const chunk = (data ?? []) as T[];
+    all.push(...chunk);
+
+    if (chunk.length < BATCH_SIZE) break;
+
+    from += BATCH_SIZE;
+    to += BATCH_SIZE;
+  }
+
+  return all;
+}
+
 const AdminPanel = () => {
   const { user, loading } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -105,23 +134,23 @@ const AdminPanel = () => {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [targetResponse, notRelevantResponse, synonymsResponse, universitiesResponse, costsResponse, profilesResponse, allowedEmailsResponse] = await Promise.all([
-        supabase.from('target_companies').select('*').order('company_name').limit(10000),
-        supabase.from('not_relevant_companies').select('*').order('company_name').limit(10000),
-        supabase.from('synonyms').select('*').order('canonical_term').limit(10000),
-        supabase.from('top_universities').select('*').order('university_name').limit(10000),
+      const [targetCompaniesData, notRelevantCompaniesData, synonymsData, universitiesData, costsResponse, profilesData, allowedEmailsData] = await Promise.all([
+        fetchAllRows<Company>('target_companies', 'company_name'),
+        fetchAllRows<Company>('not_relevant_companies', 'company_name'),
+        fetchAllRows<Synonym>('synonyms', 'canonical_term'),
+        fetchAllRows<TopUniversity>('top_universities', 'university_name'),
         supabase.from('api_costs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('*').order('email').limit(10000),
-        supabase.from('allowed_emails').select('*').order('email').limit(10000)
+        fetchAllRows<any>('profiles', 'email'),
+        fetchAllRows<AllowedEmail>('allowed_emails', 'email')
       ]);
 
-      if (targetResponse.data) setTargetCompanies(targetResponse.data);
-      if (notRelevantResponse.data) setNotRelevantCompanies(notRelevantResponse.data);
-      if (synonymsResponse.data) setSynonyms(synonymsResponse.data);
-      if (universitiesResponse.data) setTopUniversities(universitiesResponse.data);
+      setTargetCompanies(targetCompaniesData);
+      setNotRelevantCompanies(notRelevantCompaniesData);
+      setSynonyms(synonymsData);
+      setTopUniversities(universitiesData);
       if (costsResponse.data) setApiCosts(costsResponse.data);
-      if (profilesResponse.data) setUserProfiles(profilesResponse.data);
-      if (allowedEmailsResponse.data) setAllowedEmails(allowedEmailsResponse.data);
+      setUserProfiles(profilesData);
+      setAllowedEmails(allowedEmailsData);
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -220,13 +249,11 @@ const AdminPanel = () => {
         return;
       }
       
-      // Check for existing companies
-      const { data: existingCompanies } = await supabase
-        .from('target_companies')
-        .select('company_name');
+      // Check for existing companies using fetchAllRows
+      const existingCompanies = await fetchAllRows<{ company_name: string }>('target_companies', 'company_name');
 
       const existingNames = new Set(
-        (existingCompanies || []).map(c => c.company_name.toLowerCase())
+        existingCompanies.map(c => c.company_name.toLowerCase())
       );
 
       const companiesToInsert = uniqueCompanies
@@ -363,13 +390,11 @@ const AdminPanel = () => {
         return;
       }
       
-      // Check for existing companies
-      const { data: existingCompanies } = await supabase
-        .from('not_relevant_companies')
-        .select('company_name');
+      // Check for existing companies using fetchAllRows
+      const existingCompanies = await fetchAllRows<{ company_name: string }>('not_relevant_companies', 'company_name');
 
       const existingNames = new Set(
-        (existingCompanies || []).map(c => c.company_name.toLowerCase())
+        existingCompanies.map(c => c.company_name.toLowerCase())
       );
 
       const companiesToInsert = uniqueCompanies
