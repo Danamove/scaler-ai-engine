@@ -54,6 +54,31 @@ export const FileUpload = ({
     }
   };
 
+  // Helper function to normalize values (convert "N/A", "NA", "-", "null" to empty string)
+  const normalizeValue = (value: any): string => {
+    if (!value) return '';
+    const str = String(value).trim();
+    const emptyValues = ['n/a', 'na', '-', 'null', 'undefined', 'none'];
+    return emptyValues.includes(str.toLowerCase()) ? '' : str;
+  };
+
+  // Helper function to get the first non-empty value from multiple possible field names
+  const getField = (row: any, candidates: string[]): string => {
+    for (const key of candidates) {
+      const value = normalizeValue(row[key]);
+      if (value) return value;
+    }
+    return '';
+  };
+
+  // Helper function to extract company name from text like "Software Engineer at Google"
+  const extractCompanyFromText = (text: string): string => {
+    if (!text) return '';
+    // Match patterns like "at Company" or "@ Company"
+    const match = text.match(/(?:at|@)\s+([^,|\n]+)/i);
+    return match ? match[1].trim() : '';
+  };
+
   const parseCSV = (file: File): Promise<any[]> => {
     return new Promise((resolve, reject) => {
       try {
@@ -121,38 +146,71 @@ export const FileUpload = ({
           return 0;
         };
 
+        // Extract fields using expanded field name mappings
+        const firstName = getField(row, ['firstName', 'first_name', 'First Name', 'givenName', 'given_name']);
+        const lastName = getField(row, ['lastName', 'last_name', 'Last Name', 'familyName', 'family_name']);
+        const linkedinUrl = getField(row, ['linkedinProfileUrl', 'linkedinUrl', 'LinkedIn URL', 'Profile URL', 'profileUrl', 'linkedIn', 'linkedin', 'url']);
+        
+        let currentTitle = getField(row, ['linkedinJobTitle', 'linkedinHeadline', 'title', 'jobTitle', 'currentTitle', 'headline', 'position', 'current_position']);
+        let currentCompany = getField(row, ['companyName', 'company', 'currentCompany', 'current_company', 'currentEmployer', 'company_current', 'currentCompanyName', 'employer', 'organization']);
+        
+        const previousCompany = getField(row, ['previousCompanyName', 'previous_company', 'lastCompany', 'pastCompany', 'previousEmployer', 'company_previous', 'priorEmployer']);
+        const location = getField(row, ['location', 'currentLocation', 'linkedinJobLocation', 'city', 'region', 'country', 'Location']);
+        const skills = getField(row, ['linkedinSkillsLabel', 'linkedinSkills', 'skills', 'Top Skills', 'skillsList']);
+        const jobDescription = getField(row, ['linkedinJobDescription', 'jobDescription', 'about', 'summary', 'Description']);
+        const degree = getField(row, ['linkedinSchoolDegree', 'degree', 'education_degree', 'linkedinPreviousSchoolDegree']);
+        const education = getField(row, ['linkedinSchoolName', 'linkedinPreviousSchoolName', 'schoolName', 'education', 'university']);
+        
+        const profileSummary = [
+          getField(row, ['linkedinDescription', 'profilesummery', 'about', 'summary', 'bio', 'experienceSummary']),
+          getField(row, ['technologies']),
+          getField(row, ['expertise']),
+          getField(row, ['competencies'])
+        ].filter(Boolean).join(' ');
+
+        // Smart fallback: extract company from title or summary if missing
+        if (!currentCompany) {
+          currentCompany = extractCompanyFromText(currentTitle) || extractCompanyFromText(profileSummary);
+        }
+
+        // Build full name from first + last if needed
+        let fullName = getField(row, ['full_name', 'fullName', 'Full Name', 'name', 'Name']);
+        if (!fullName && (firstName || lastName)) {
+          fullName = `${firstName} ${lastName}`.trim();
+        }
+
         return {
           user_id: activeUserId,
           job_id: currentJobId,
-          full_name: `${row.firstName || ''} ${row.lastName || ''}`.trim(),
-          current_title: row.linkedinJobTitle || row.linkedinHeadline || '',
-          current_company: row.companyName || '',
-          previous_company: row.previousCompanyName || '',
-          linkedin_url: row.linkedinProfileUrl || '',
-          
-          // Location from CSV
-          location: row.location || row.linkedinJobLocation || '',
-          
-          // Skills as separate field
-          skills: row.linkedinSkillsLabel || row.linkedinSkills || row.skills || '',
-          
-          // Job description
-          job_description: row.linkedinJobDescription || '',
-          
-          // Academic degree
-          degree: row.linkedinSchoolDegree || row.linkedinPreviousSchoolDegree || '',
-          
-          profile_summary: [
-            row.linkedinDescription || row.profilesummery || '',
-            row.technologies || '',
-            row.expertise || '',
-            row.competencies || ''
-          ].filter(Boolean).join(' '),
-          education: row.linkedinSchoolName || row.linkedinPreviousSchoolName || '',
-          years_of_experience: getYearsFromDateRange(row.linkedinJobDateRange || ''),
-          months_in_current_role: getCurrentRoleMonths(row.linkedinJobDateRange || ''),
+          full_name: fullName,
+          current_title: currentTitle,
+          current_company: currentCompany,
+          previous_company: previousCompany,
+          linkedin_url: linkedinUrl,
+          location: location,
+          skills: skills,
+          job_description: jobDescription,
+          degree: degree,
+          profile_summary: profileSummary,
+          education: education,
+          years_of_experience: getYearsFromDateRange(getField(row, ['linkedinJobDateRange', 'dateRange', 'jobDateRange'])),
+          months_in_current_role: getCurrentRoleMonths(getField(row, ['linkedinJobDateRange', 'dateRange', 'jobDateRange'])),
         };
       });
+
+      // Quality control: check for missing critical fields
+      const missingCriticalFields = rawDataRecords.filter(
+        (record) => !record.current_title || !record.current_company
+      );
+      const missingPercentage = (missingCriticalFields.length / rawDataRecords.length) * 100;
+
+      if (missingPercentage > 20) {
+        toast({
+          title: "Data Quality Warning",
+          description: `${missingCriticalFields.length} of ${rawDataRecords.length} records are missing title or company. Check your CSV column names.`,
+          variant: "default",
+        });
+      }
 
       console.log('Starting database insert...');
       setCurrentStep('Saving to database...');
