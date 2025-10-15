@@ -34,6 +34,19 @@ interface FilterStats {
   final_results: number;
 }
 
+const REJECTION_REASON_FILTERS = [
+  { value: 'all', label: 'Show all rejections', includes: [] },
+  { value: 'blacklisted', label: 'Blacklisted company', includes: ['Blacklisted company'] },
+  { value: 'past_candidate', label: 'Past candidate', includes: ['Past candidate'] },
+  { value: 'not_relevant', label: 'Not relevant company', includes: ['NotRelevant company'] },
+  { value: 'wanted_miss', label: 'Not in wanted companies list', includes: ['Not in wanted companies list', 'Not from target company', 'No target company match'] },
+  { value: 'role_duration', label: 'Insufficient role duration', includes: ['Insufficient role duration'] },
+  { value: 'missing_terms', label: 'Missing required terms', includes: ['Missing required terms'] },
+  { value: 'excluded_terms', label: 'Contains excluded terms', includes: ['Contains excluded terms'] },
+  { value: 'excluded_location', label: 'Excluded location detected', includes: ['Excluded location detected'] },
+  { value: 'top_uni', label: 'Top university requirement not met', includes: ['Top university requirement not met'] },
+] as const;
+
 const Results = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -671,16 +684,9 @@ const Results = () => {
                         <SelectValue placeholder="Select rejection reason" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Show all rejections</SelectItem>
-                        <SelectItem value="Blacklisted company">Blacklisted company</SelectItem>
-                        <SelectItem value="Past candidate">Past candidate</SelectItem>
-                        <SelectItem value="NotRelevant company">NotRelevant company</SelectItem>
-                        <SelectItem value="Insufficient role duration">Insufficient role duration</SelectItem>
-                        <SelectItem value="Missing required terms">Missing required terms</SelectItem>
-                        <SelectItem value="Contains excluded terms">Contains excluded terms</SelectItem>
-                        <SelectItem value="Excluded location detected">Excluded location detected</SelectItem>
-                        <SelectItem value="Top university requirement not met">Top university requirement not met</SelectItem>
-                        <SelectItem value="No target company match">No target company match</SelectItem>
+                        {REJECTION_REASON_FILTERS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -692,8 +698,11 @@ const Results = () => {
                       
                       if (rejectionReasonFilter === 'all') return true;
                       
-                      return r.filter_reasons?.some(reason => 
-                        reason.includes(rejectionReasonFilter)
+                      const def = REJECTION_REASON_FILTERS.find(d => d.value === rejectionReasonFilter);
+                      if (!def) return true;
+                      
+                      return r.filter_reasons?.some(reason =>
+                        def.includes.some(substr => reason.includes(substr))
                       ) || false;
                     })}
                     showStageInfo={false}
