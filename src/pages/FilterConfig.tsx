@@ -25,6 +25,7 @@ const FilterConfig = () => {
     // Stage 1 Filters
     useNotRelevantFilter: false,
     useTargetCompaniesFilter: false,
+    useWantedCompaniesFilter: true,
     // Stage 2 Filters
     minMonthsCurrentRole: 0,
     excludeTerms: '',
@@ -73,6 +74,7 @@ const FilterConfig = () => {
             jobTitle: filterRules.job_id || '',
             useNotRelevantFilter: filterRules.use_not_relevant_filter || false,
             useTargetCompaniesFilter: filterRules.use_target_companies_filter || false,
+            useWantedCompaniesFilter: filterRules.use_wanted_companies_filter ?? true,
             minMonthsCurrentRole: filterRules.min_months_current_role || 0,
             // Display raw strings to preserve logic syntax
             excludeTerms: (filterRules.exclude_terms || []).join(''),
@@ -162,6 +164,7 @@ const FilterConfig = () => {
           // Stage 1 settings
           use_not_relevant_filter: config.useNotRelevantFilter,
           use_target_companies_filter: config.useTargetCompaniesFilter,
+          use_wanted_companies_filter: config.useWantedCompaniesFilter,
           // Stage 2 settings
           min_months_current_role: config.minMonthsCurrentRole,
           // Store raw input strings to preserve logic syntax
@@ -361,6 +364,20 @@ const FilterConfig = () => {
                       Keep only candidates from built-in Target companies list (current + previous company)
                     </p>
                   </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="wantedCompanies"
+                        checked={config.useWantedCompaniesFilter}
+                        onCheckedChange={(checked) => setConfig({...config, useWantedCompaniesFilter: checked})}
+                      />
+                      <Label htmlFor="wantedCompanies" className="font-medium">Filter by Wanted Companies</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Keep only candidates from your Wanted Companies list (current + previous company)
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
@@ -391,7 +408,7 @@ const FilterConfig = () => {
                       onChange={(e) => setWantedCompanies(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      One company per line. If filled, combined with Target Companies filter (if enabled). Shows candidates from <strong>wanted list + target companies</strong>.
+                      One company per line. Enable "Filter by Wanted Companies" above to activate. Can be combined with Target Companies filter.
                     </p>
                   </div>
                 </div>

@@ -106,6 +106,7 @@ export type Database = {
           updated_at: string
           use_not_relevant_filter: boolean | null
           use_target_companies_filter: boolean | null
+          use_wanted_companies_filter: boolean | null
           user_id: string
         }
         Insert: {
@@ -121,6 +122,7 @@ export type Database = {
           updated_at?: string
           use_not_relevant_filter?: boolean | null
           use_target_companies_filter?: boolean | null
+          use_wanted_companies_filter?: boolean | null
           user_id: string
         }
         Update: {
@@ -136,6 +138,7 @@ export type Database = {
           updated_at?: string
           use_not_relevant_filter?: boolean | null
           use_target_companies_filter?: boolean | null
+          use_wanted_companies_filter?: boolean | null
           user_id?: string
         }
         Relationships: []

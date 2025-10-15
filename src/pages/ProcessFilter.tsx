@@ -410,8 +410,8 @@ const ProcessFilter = () => {
             combinedWantedList.push(...targetList);
           }
           
-          // If user has wanted companies (with or without target), filter by combined list
-          if (userWantedList.length > 0) {
+          // If user has wanted companies filter enabled, filter by combined list
+          if (filterRules.use_wanted_companies_filter && userWantedList.length > 0) {
             const currentCompany = candidate.current_company || '';
             const previousCompany = candidate.previous_company || '';
             
