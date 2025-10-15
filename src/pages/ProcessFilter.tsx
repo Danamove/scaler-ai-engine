@@ -593,7 +593,7 @@ const ProcessFilter = () => {
                     if (!aiResult.passes_location_exclusion_check && filterRules.exclude_location_terms && filterRules.exclude_location_terms.length > 0) {
                       filterReasons.push(`Excluded location detected: ${filterRules.exclude_location_terms.join(', ')}`);
                     }
-                    if (aiResult.passes_top_university_check === false) {
+                    if (filterRules.require_top_uni && aiResult.passes_top_university_check === false) {
                       filterReasons.push('Top university requirement not met');
                     }
                     
@@ -647,7 +647,7 @@ const ProcessFilter = () => {
                                 aiPasses_must_have_terms_check && 
                                 aiPasses_exclude_terms_check && 
                                 aiResult.passes_location_exclusion_check && 
-                                (aiResult.passes_top_university_check !== false);
+                                (!filterRules.require_top_uni || aiResult.passes_top_university_check !== false);
                     
                     // Check Target companies (moved from Stage 1 to Stage 2)
                     if (stage2Pass && filterRules.use_target_companies_filter) {
