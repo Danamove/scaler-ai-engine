@@ -26,6 +26,7 @@ const FilterConfig = () => {
     useNotRelevantFilter: false,
     useTargetCompaniesFilter: false,
     useWantedCompaniesFilter: true,
+    useWantedUniversitiesFilter: true,
     // Stage 2 Filters
     minMonthsCurrentRole: 0,
     excludeTerms: '',
@@ -37,6 +38,7 @@ const FilterConfig = () => {
   
   const [blacklistCompanies, setBlacklistCompanies] = useState('');
   const [wantedCompanies, setWantedCompanies] = useState('');
+  const [wantedUniversities, setWantedUniversities] = useState('');
   const [pastCandidates, setPastCandidates] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -75,6 +77,7 @@ const FilterConfig = () => {
             useNotRelevantFilter: filterRules.use_not_relevant_filter || false,
             useTargetCompaniesFilter: filterRules.use_target_companies_filter || false,
             useWantedCompaniesFilter: filterRules.use_wanted_companies_filter ?? true,
+            useWantedUniversitiesFilter: filterRules.use_wanted_universities_filter ?? true,
             minMonthsCurrentRole: filterRules.min_months_current_role || 0,
             // Display raw strings to preserve logic syntax
             excludeTerms: (filterRules.exclude_terms || []).join(''),
@@ -104,6 +107,17 @@ const FilterConfig = () => {
           
           if (wanted?.length) {
             setWantedCompanies(wanted.map(w => w.company_name).join('\n'));
+          }
+
+          // Load wanted universities for this job
+          const { data: wantedUnis } = await supabase
+            .from('user_wanted_universities')
+            .select('university_name')
+            .eq('user_id', user.id)
+            .eq('job_id', filterRules.job_id);
+          
+          if (wantedUnis?.length) {
+            setWantedUniversities(wantedUnis.map(u => u.university_name).join('\n'));
           }
 
           // Load past candidates for this job
@@ -165,6 +179,7 @@ const FilterConfig = () => {
           use_not_relevant_filter: config.useNotRelevantFilter,
           use_target_companies_filter: config.useTargetCompaniesFilter,
           use_wanted_companies_filter: config.useWantedCompaniesFilter,
+          use_wanted_universities_filter: config.useWantedUniversitiesFilter,
           // Stage 2 settings
           min_months_current_role: config.minMonthsCurrentRole,
           // Store raw input strings to preserve logic syntax
@@ -215,6 +230,26 @@ const FilterConfig = () => {
             .upsert(wantedData, { onConflict: 'user_id,job_id,company_name' });
 
           if (wantedError) throw wantedError;
+        }
+      }
+
+      // Save wanted universities if provided
+      if (wantedUniversities.trim()) {
+        const universities = wantedUniversities.split('\n').map(u => u.trim()).filter(Boolean);
+        const uniqueUniversities = [...new Set(universities)].filter(university => university.length > 0);
+        
+        if (uniqueUniversities.length > 0) {
+          const universitiesData = uniqueUniversities.map(university => ({
+            user_id: user.id,
+            job_id: config.jobTitle,
+            university_name: university,
+          }));
+
+          const { error: universitiesError } = await supabase
+            .from('user_wanted_universities')
+            .upsert(universitiesData, { onConflict: 'user_id,job_id,university_name' });
+
+          if (universitiesError) throw universitiesError;
         }
       }
 
@@ -378,6 +413,20 @@ const FilterConfig = () => {
                       Keep only candidates from your Wanted Companies list (current + previous company)
                     </p>
                   </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="wantedUniversities"
+                        checked={config.useWantedUniversitiesFilter}
+                        onCheckedChange={(checked) => setConfig({...config, useWantedUniversitiesFilter: checked})}
+                      />
+                      <Label htmlFor="wantedUniversities" className="font-medium">Filter by Wanted Universities</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Keep only candidates who studied at your Wanted Universities list
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
@@ -409,6 +458,20 @@ const FilterConfig = () => {
                     />
                     <p className="text-xs text-muted-foreground">
                       One company per line. Enable "Filter by Wanted Companies" above to activate. Can be combined with Target Companies filter.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="wantedUniversities">Wanted Universities</Label>
+                    <Textarea
+                      id="wantedUniversities"
+                      placeholder="Tel Aviv University&#10;Technion&#10;Hebrew University of Jerusalem"
+                      rows={6}
+                      value={wantedUniversities}
+                      onChange={(e) => setWantedUniversities(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      One university per line. Enable "Filter by Wanted Universities" above to activate.
                     </p>
                   </div>
                 </div>

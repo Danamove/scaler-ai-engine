@@ -107,6 +107,7 @@ export type Database = {
           use_not_relevant_filter: boolean | null
           use_target_companies_filter: boolean | null
           use_wanted_companies_filter: boolean | null
+          use_wanted_universities_filter: boolean | null
           user_id: string
         }
         Insert: {
@@ -123,6 +124,7 @@ export type Database = {
           use_not_relevant_filter?: boolean | null
           use_target_companies_filter?: boolean | null
           use_wanted_companies_filter?: boolean | null
+          use_wanted_universities_filter?: boolean | null
           user_id: string
         }
         Update: {
@@ -139,6 +141,7 @@ export type Database = {
           use_not_relevant_filter?: boolean | null
           use_target_companies_filter?: boolean | null
           use_wanted_companies_filter?: boolean | null
+          use_wanted_universities_filter?: boolean | null
           user_id?: string
         }
         Relationships: []
@@ -504,6 +507,30 @@ export type Database = {
           created_at?: string
           id?: string
           job_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_wanted_universities: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string
+          university_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id: string
+          university_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          university_name?: string
           user_id?: string
         }
         Relationships: []

@@ -66,6 +66,29 @@ const isCompanyMatch = (candidateCompany: string, blacklistCompany: string): boo
   return false;
 };
 
+// University matching helpers
+const normalizeUniversityName = (universityName: string): string => {
+  if (!universityName) return '';
+  
+  return universityName
+    .toLowerCase()
+    .trim()
+    .replace(/[.,\-()[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(university|institute|college|of|technology|the)\b/gi, '')
+    .trim();
+};
+
+const isUniversityMatch = (candidateEducation: string, wantedUniversity: string): boolean => {
+  if (!candidateEducation || !wantedUniversity) return false;
+  
+  const normalized = normalizeUniversityName(candidateEducation);
+  const wantedNormalized = normalizeUniversityName(wantedUniversity);
+  
+  // Check if candidate's education contains the wanted university
+  return normalized.includes(wantedNormalized) || wantedNormalized.includes(normalized);
+};
+
 // Import logic parser for enhanced term matching
 import { checkTermsWithLogic } from '@/lib/logicParser';
 
@@ -311,6 +334,12 @@ const ProcessFilter = () => {
         .eq('user_id', getActiveUserId())
         .eq('job_id', filterRules.job_id);
 
+      const { data: wantedUniversities } = await supabase
+        .from('user_wanted_universities')
+        .select('university_name')
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', filterRules.job_id);
+
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
@@ -323,6 +352,7 @@ const ProcessFilter = () => {
         targetCompanies: targetCompanies?.length || 0,
         blacklistCompanies: blacklistCompanies?.length || 0,
         wantedCompanies: wantedCompanies?.length || 0,
+        wantedUniversities: wantedUniversities?.length || 0,
         pastCandidates: pastCandidates?.length || 0
       });
 
@@ -452,6 +482,30 @@ const ProcessFilter = () => {
                 stage1Pass = false;
                 filterReasons.push('Not from target company');
               }
+            }
+          }
+        }
+
+        // Check wanted universities filter
+        if (stage1Pass) {
+          const userWantedUniversities = wantedUniversities?.map(u => u.university_name) || [];
+          
+          if (filterRules.use_wanted_universities_filter && userWantedUniversities.length > 0) {
+            const candidateEducation = candidate.education || '';
+            
+            let universityMatchFound = false;
+            
+            for (const wantedUni of userWantedUniversities) {
+              if (isUniversityMatch(candidateEducation, wantedUni)) {
+                universityMatchFound = true;
+                break;
+              }
+            }
+            
+            if (!universityMatchFound) {
+              stage1Pass = false;
+              filterReasons.push('Not from wanted universities list');
+              console.log(`Wanted universities check failed - Candidate: ${candidate.full_name}, Education: ${candidateEducation}`);
             }
           }
         }
