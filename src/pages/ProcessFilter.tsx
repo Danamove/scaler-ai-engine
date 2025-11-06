@@ -209,11 +209,22 @@ const ProcessFilter = () => {
     if (!user) return;
 
     try {
-      // Get total candidates for the user
+      // Get filter rules to know which job we're processing
+      const { data: filterRulesArray } = await supabase
+        .from('filter_rules')
+        .select('job_id')
+        .eq('user_id', getActiveUserId())
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
+
+      // Count only candidates for this specific job
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', getActiveUserId());
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', currentJobId);
 
       setStats(prev => ({ ...prev, totalCandidates: totalCandidates || 0 }));
     } catch (error) {
@@ -251,12 +262,27 @@ const ProcessFilter = () => {
     setCancelled(false);
 
     try {
-      // Get candidates and filter rules
-      console.log('Loading data...');
+      // Get filter rules first
+      console.log('Loading filter rules...');
       setCurrentStep('Loading data...');
       setProgress(10);
 
+      const { data: filterRulesArray, error: filterRulesError } = await supabase
+        .from('filter_rules')
+        .select('*')
+        .eq('user_id', getActiveUserId())
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const filterRules = filterRulesArray?.[0];
+
+      if (filterRulesError) {
+        console.error('Error loading filter rules:', filterRulesError);
+        throw filterRulesError;
+      }
+
       // Load all candidates with pagination to bypass 1000 row limit
+      console.log('Loading candidates...');
       let allCandidates = [];
       let hasMore = true;
       let offset = 0;
@@ -267,6 +293,7 @@ const ProcessFilter = () => {
           .from('raw_data')
           .select('*')
           .eq('user_id', getActiveUserId())
+          .eq('job_id', filterRules?.job_id || 'current')
           .range(offset, offset + pageSize - 1);
 
         if (candidatesError) {
@@ -284,20 +311,6 @@ const ProcessFilter = () => {
       }
 
       const candidates = allCandidates;
-
-      const { data: filterRulesArray, error: filterRulesError } = await supabase
-        .from('filter_rules')
-        .select('*')
-        .eq('user_id', getActiveUserId())
-        .order('updated_at', { ascending: false })
-        .limit(1);
-
-      const filterRules = filterRulesArray?.[0];
-
-      if (filterRulesError) {
-        console.error('Error loading filter rules:', filterRulesError);
-        throw filterRulesError;
-      }
 
       if (!candidates || !filterRules) {
         throw new Error('Missing candidates or filter configuration');

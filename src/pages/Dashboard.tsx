@@ -83,11 +83,22 @@ const Dashboard = () => {
 
     setStatsLoading(true);
     try {
-      // Fetch total candidates processed
+      // Get the most recent job_id for this user
+      const { data: filterRulesArray } = await supabase
+        .from('filter_rules')
+        .select('job_id')
+        .eq('user_id', activeUserId)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
+
+      // Count candidates for the current job only
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact' })
-        .eq('user_id', activeUserId);
+        .eq('user_id', activeUserId)
+        .eq('job_id', currentJobId);
 
       // Fetch filtered results for accuracy calculation
       const { data: filteredResults } = await supabase

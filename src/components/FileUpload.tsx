@@ -212,6 +212,22 @@ export const FileUpload = ({
         });
       }
 
+      // Delete old data for this user+job combination before inserting new data
+      console.log(`Deleting existing data for user ${activeUserId}, job ${currentJobId}...`);
+      setCurrentStep('Clearing old data...');
+
+      const { error: deleteError } = await supabase
+        .from('raw_data')
+        .delete()
+        .eq('user_id', activeUserId)
+        .eq('job_id', currentJobId);
+
+      if (deleteError) {
+        console.error('Error deleting old data:', deleteError);
+        // Continue anyway - don't block upload
+      }
+
+      console.log('Old data cleared, proceeding with new data...');
       console.log('Starting database insert...');
       setCurrentStep('Saving to database...');
       setUploadProgress(60);
