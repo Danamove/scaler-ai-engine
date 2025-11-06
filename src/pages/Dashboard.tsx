@@ -33,6 +33,7 @@ const Dashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobId, loading: jobLoading, clearActiveJob } = useCurrentJob();
 
   const handleRestartAll = async () => {
     const activeUserId = getActiveUserId();

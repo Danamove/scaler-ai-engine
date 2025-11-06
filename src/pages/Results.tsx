@@ -53,6 +53,7 @@ const Results = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobId, loading: jobLoading } = useCurrentJob();
   
   const [results, setResults] = useState<CandidateResult[]>([]);
   const [stats, setStats] = useState<FilterStats>({

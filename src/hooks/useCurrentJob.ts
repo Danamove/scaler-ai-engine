@@ -12,7 +12,7 @@ interface CurrentJobState {
 
 export const useCurrentJob = () => {
   const [searchParams] = useSearchParams();
-  const { activeJob, setActiveJob, loading: activeJobLoading } = useActiveJob();
+  const { activeJob, setActiveJob, clearActiveJob, loading: activeJobLoading } = useActiveJob();
   const { createJob } = useJobManager();
   const { getActiveUserId } = useAdminImpersonation();
 
@@ -102,5 +102,6 @@ export const useCurrentJob = () => {
     jobName: state.jobName,
     loading,
     setActiveJob,
+    clearActiveJob,
   };
 };

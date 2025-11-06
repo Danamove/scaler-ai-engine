@@ -179,6 +179,7 @@ const ProcessFilter = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobId, loading: jobLoading } = useCurrentJob();
   
   const [processing, setProcessing] = useState(false);
   const [stats, setStats] = useState<ProcessStats>({
