@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useCurrentJob } from '@/hooks/useCurrentJob';
 
 // Helper functions for enhanced filtering
 const normalizeCompanyName = (companyName: string): string => {
@@ -198,33 +199,23 @@ const ProcessFilter = () => {
   const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !jobLoading && !user) {
       navigate('/auth');
-    } else if (user) {
+    } else if (!loading && !jobLoading && user && jobId) {
       loadInitialStats();
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, jobLoading, jobId, navigate]);
 
   const loadInitialStats = async () => {
     if (!user) return;
 
     try {
-      // Get filter rules to know which job we're processing
-      const { data: filterRulesArray } = await supabase
-        .from('filter_rules')
-        .select('job_id')
-        .eq('user_id', getActiveUserId())
-        .order('updated_at', { ascending: false })
-        .limit(1);
-
-      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
-
       // Count only candidates for this specific job
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', getActiveUserId())
-        .eq('job_id', currentJobId);
+        .eq('job_id', jobId!);
 
       setStats(prev => ({ ...prev, totalCandidates: totalCandidates || 0 }));
     } catch (error) {
@@ -275,6 +266,7 @@ const ProcessFilter = () => {
         .limit(1);
 
       const filterRules = filterRulesArray?.[0];
+      const currentJobId = jobId!;
 
       if (filterRulesError) {
         console.error('Error loading filter rules:', filterRulesError);
@@ -293,7 +285,7 @@ const ProcessFilter = () => {
           .from('raw_data')
           .select('*')
           .eq('user_id', getActiveUserId())
-          .eq('job_id', filterRules?.job_id || 'current')
+          .eq('job_id', currentJobId)
           .range(offset, offset + pageSize - 1);
 
         if (candidatesError) {
@@ -339,25 +331,25 @@ const ProcessFilter = () => {
         .from('user_blacklist')
         .select('company_name')
         .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('job_id', currentJobId);
 
       const { data: wantedCompanies } = await supabase
         .from('user_wanted_companies')
         .select('company_name')
         .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('job_id', currentJobId);
 
       const { data: wantedUniversities } = await supabase
         .from('user_wanted_universities')
         .select('university_name')
         .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('job_id', currentJobId);
 
       const { data: pastCandidates } = await supabase
         .from('user_past_candidates')
         .select('candidate_name')
         .eq('user_id', getActiveUserId())
-        .eq('job_id', filterRules.job_id);
+        .eq('job_id', currentJobId);
 
       console.log('Loaded lists:', {
         synonyms: synonyms?.length || 0,
@@ -373,7 +365,8 @@ const ProcessFilter = () => {
       const { error: deleteError } = await supabase
         .from('filtered_results')
         .delete()
-        .eq('user_id', getActiveUserId());
+        .eq('user_id', getActiveUserId())
+        .eq('job_id', currentJobId);
 
       if (deleteError) {
         console.error('Error clearing previous results:', deleteError);
@@ -534,7 +527,7 @@ const ProcessFilter = () => {
           results.push({
             raw_data_id: candidate.id,
             user_id: getActiveUserId(),
-            job_id: filterRules.job_id,
+            job_id: currentJobId,
             stage_1_passed: false,
             stage_2_passed: false,
             filter_reasons: filterReasons
@@ -738,7 +731,7 @@ const ProcessFilter = () => {
                     results.push({
                       raw_data_id: candidate.id,
                       user_id: getActiveUserId(),
-                      job_id: filterRules.job_id,
+                      job_id: currentJobId,
                       stage_1_passed: true,
                       stage_2_passed: stage2Pass,
                       filter_reasons: filterReasons
@@ -846,7 +839,7 @@ const ProcessFilter = () => {
                   results.push({
                     raw_data_id: candidate.id,
                     user_id: getActiveUserId(),
-                    job_id: filterRules.job_id,
+                    job_id: currentJobId,
                     stage_1_passed: true,
                     stage_2_passed: stage2Pass,
                     filter_reasons: filterReasons

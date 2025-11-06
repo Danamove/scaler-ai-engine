@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useCurrentJob } from '@/hooks/useCurrentJob';
 
 interface CandidateResult {
   id: string;
@@ -65,12 +66,12 @@ const Results = () => {
   const [rejectionReasonFilter, setRejectionReasonFilter] = useState<string>('all');
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !jobLoading && !user) {
       navigate('/auth');
-    } else if (user) {
+    } else if (!loading && !jobLoading && user && jobId) {
       loadResults();
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, jobLoading, jobId, navigate]);
 
   const loadResults = async () => {
     const activeUserId = getActiveUserId();
@@ -79,15 +80,8 @@ const Results = () => {
     try {
       setLoadingResults(true);
 
-      // Get the current job_id (latest from filter_rules)
-      const { data: filterRulesArray } = await supabase
-        .from('filter_rules')
-        .select('job_id')
-        .eq('user_id', activeUserId)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-
-      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
+      const currentJobId = jobId;
+      if (!currentJobId) throw new Error('No active job selected');
       console.log(`[Results] Loading results for user ${activeUserId}, job ${currentJobId}`);
 
       // Get all filtered results with pagination to handle large datasets
@@ -247,7 +241,8 @@ const Results = () => {
         .from('filtered_results')
         .delete()
         .eq('id', candidateId)
-        .eq('user_id', activeUserId);
+        .eq('user_id', activeUserId)
+        .eq('job_id', jobId!);
 
       if (error) throw error;
 
@@ -255,18 +250,17 @@ const Results = () => {
       setResults(prevResults => {
         const newResults = prevResults.filter(r => r.id !== candidateId);
         
-        // Update stats based on new results
-        const totalCandidates = newResults.length;
+        // Update stats based on new results (keep total from raw count)
         const stage1Passed = newResults.filter(r => r.stage_1_passed).length;
         const finalResults = newResults.filter(r => r.stage_1_passed && r.stage_2_passed).length;
         const stage2Passed = finalResults;
 
-        setStats({
-          total_candidates: totalCandidates,
+        setStats(prev => ({
+          ...prev,
           stage_1_passed: stage1Passed,
           stage_2_passed: stage2Passed,
           final_results: finalResults
-        });
+        }));
 
         return newResults;
       });
@@ -332,7 +326,7 @@ const Results = () => {
     }
   };
 
-  if (loading || loadingResults) {
+  if (loading || jobLoading || loadingResults) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">

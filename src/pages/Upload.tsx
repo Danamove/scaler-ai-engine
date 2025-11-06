@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Filter, Database, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrentJob } from '@/hooks/useCurrentJob';
 
 const Upload = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobId, jobName, loading: jobLoading } = useCurrentJob();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -19,7 +21,7 @@ const Upload = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  if (loading || jobLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -93,6 +95,7 @@ const Upload = () => {
             acceptedTypes=".csv"
             onUploadComplete={handleUploadComplete}
             userId={getActiveUserId()}
+            jobId={jobId || undefined}
           />
 
           {/* Info Card - Simplified */}

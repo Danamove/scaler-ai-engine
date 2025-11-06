@@ -11,6 +11,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useCurrentJob } from '@/hooks/useCurrentJob';
 
 interface DashboardStats {
   totalCandidates: number;
@@ -57,7 +58,11 @@ const Dashboard = () => {
         supabase.from('netly_files').delete().eq('user_id', activeUserId),
         supabase.from('jobs').delete().eq('user_id', activeUserId)
       ]);
-      
+      // Legacy cleanup for 'current' session data
+      await supabase.from('raw_data').delete().eq('user_id', activeUserId).eq('job_id', 'current');
+      // Clear active job selection
+      clearActiveJob?.();
+
       toast({
         title: "Restart completed successfully",
         description: `All data has been deleted for ${activeUserEmail}. You can start fresh.`,
@@ -80,32 +85,25 @@ const Dashboard = () => {
 
   const fetchDashboardStats = async () => {
     const activeUserId = getActiveUserId();
-    if (!activeUserId) return;
+    if (!activeUserId || !jobId) return;
 
     setStatsLoading(true);
     try {
-      // Get the most recent job_id for this user
-      const { data: filterRulesArray } = await supabase
-        .from('filter_rules')
-        .select('job_id')
-        .eq('user_id', activeUserId)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-
-      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
+      if (!jobId) return;
 
       // Count candidates for the current job only
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact' })
         .eq('user_id', activeUserId)
-        .eq('job_id', currentJobId);
+        .eq('job_id', jobId);
 
-      // Fetch filtered results for accuracy calculation
+      // Fetch filtered results for accuracy calculation (scoped to job)
       const { data: filteredResults } = await supabase
         .from('filtered_results')
         .select('stage_1_passed, stage_2_passed')
-        .eq('user_id', activeUserId);
+        .eq('user_id', activeUserId)
+        .eq('job_id', jobId);
 
       // Calculate filter accuracy
       let filterAccuracy = 0;
@@ -135,10 +133,10 @@ const Dashboard = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (user && jobId && !jobLoading) {
       fetchDashboardStats();
     }
-  }, [user, getActiveUserId]);
+  }, [user, jobId, jobLoading, getActiveUserId]);
 
   if (loading) {
     return (

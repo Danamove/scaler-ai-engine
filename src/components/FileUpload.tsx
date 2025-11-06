@@ -108,9 +108,10 @@ export const FileUpload = ({
 
   const saveToDatabase = async (data: any[]) => {
     const activeUserId = userId || user?.id;
-    if (!activeUserId) return;
+    if (!activeUserId) throw new Error('No active user');
+    if (!jobId) throw new Error('No active job selected. Please create or select a job first.');
 
-    const currentJobId = jobId || 'current';
+    const currentJobId = jobId;
 
     try {
       console.log('Transforming data for database...');
