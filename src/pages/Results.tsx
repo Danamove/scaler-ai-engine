@@ -161,11 +161,23 @@ const Results = () => {
     }
   };
 
+  // Security: Sanitize CSV values to prevent formula injection
+  const sanitizeForCSV = (value: string): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    // If value starts with dangerous characters (=, +, -, @, tab, carriage return)
+    // prepend with single quote to prevent Excel formula execution
+    if (/^[=+\-@\t\r]/.test(trimmed)) {
+      return `'${trimmed}`;
+    }
+    return trimmed;
+  };
+
   const exportToCSV = (data: CandidateResult[], filename: string, includeRejectionReasons: boolean = false) => {
     const headers = includeRejectionReasons
       ? [
           'Full Name',
-          'Current Title', 
+          'Current Title',
           'Current Company',
           'Previous Company',
           'LinkedIn URL',
@@ -174,7 +186,7 @@ const Results = () => {
         ]
       : [
           'Full Name',
-          'Current Title', 
+          'Current Title',
           'Current Company',
           'Previous Company',
           'LinkedIn URL',
@@ -185,21 +197,21 @@ const Results = () => {
       headers.join(','),
       ...data.map(row => {
         const baseData = [
-          `"${row.full_name}"`,
-          `"${row.current_title}"`,
-          `"${row.current_company}"`,
-          `"${row.previous_company}"`,
-          `"${row.linkedin_url}"`,
-          `"${row.profile_summary.substring(0, 100)}..."`
+          `"${sanitizeForCSV(row.full_name)}"`,
+          `"${sanitizeForCSV(row.current_title)}"`,
+          `"${sanitizeForCSV(row.current_company)}"`,
+          `"${sanitizeForCSV(row.previous_company)}"`,
+          `"${sanitizeForCSV(row.linkedin_url)}"`,
+          `"${sanitizeForCSV(row.profile_summary.substring(0, 100))}..."`
         ];
-        
+
         if (includeRejectionReasons) {
-          const reasons = row.filter_reasons && row.filter_reasons.length > 0 
-            ? row.filter_reasons.join('; ') 
+          const reasons = row.filter_reasons && row.filter_reasons.length > 0
+            ? row.filter_reasons.join('; ')
             : 'No specific reason';
-          baseData.push(`"${reasons}"`);
+          baseData.push(`"${sanitizeForCSV(reasons)}"`);
         }
-        
+
         return baseData.join(',');
       })
     ].join('\n');

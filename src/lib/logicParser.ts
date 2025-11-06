@@ -6,11 +6,15 @@ export interface LogicNode {
   children?: LogicNode[];
 }
 
+// Security: Maximum nesting depth to prevent ReDoS attacks
+const MAX_DEPTH = 10;
+
 export class LogicParser {
   /**
    * Parse a string with AND/OR logic into a tree structure
    * Supports: "node AND react", "typescript OR react", "(node AND react) OR python"
    * Default: comma-separated = OR (backward compatibility)
+   * Security: Limited to MAX_DEPTH nesting levels to prevent ReDoS
    */
   static parse(input: string): LogicNode {
     if (!input || !input.trim()) {
@@ -35,16 +39,21 @@ export class LogicParser {
       };
     }
 
-    return this.parseExpression(normalized);
+    return this.parseExpression(normalized, 0);
   }
 
-  private static parseExpression(expr: string): LogicNode {
+  private static parseExpression(expr: string, depth: number = 0): LogicNode {
+    // Security: Prevent excessive nesting depth (ReDoS protection)
+    if (depth > MAX_DEPTH) {
+      throw new Error(`Maximum nesting depth (${MAX_DEPTH}) exceeded. Simplify your logic expression.`);
+    }
+
     // Handle parentheses first
     expr = expr.trim();
     
     if (expr.startsWith('(') && expr.endsWith(')')) {
       // Remove outer parentheses and parse inner expression
-      return this.parseExpression(expr.slice(1, -1));
+      return this.parseExpression(expr.slice(1, -1), depth + 1);
     }
 
     // Split by OR first (lower precedence)
@@ -52,7 +61,7 @@ export class LogicParser {
     if (orParts.length > 1) {
       return {
         type: 'OR',
-        children: orParts.map(part => this.parseExpression(part))
+        children: orParts.map(part => this.parseExpression(part, depth + 1))
       };
     }
 
@@ -61,7 +70,7 @@ export class LogicParser {
     if (andParts.length > 1) {
       return {
         type: 'AND',
-        children: andParts.map(part => this.parseExpression(part))
+        children: andParts.map(part => this.parseExpression(part, depth + 1))
       };
     }
 

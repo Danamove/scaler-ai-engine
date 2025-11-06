@@ -6,11 +6,14 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
+    // Security: Improved type safety settings
+    "noImplicitAny": true,           // Require explicit types - prevents accidental 'any'
+    "noUnusedParameters": true,      // Catch unused function parameters
+    "skipLibCheck": true,            // Keep for performance
+    "allowJs": true,                 // Keep for compatibility
+    "noUnusedLocals": true,          // Catch unused variables
+    "strictNullChecks": true,        // Prevent null/undefined errors
+    "noImplicitReturns": true,       // Ensure all code paths return a value
+    "noFallthroughCasesInSwitch": true  // Prevent switch fallthrough bugs
   }
 }

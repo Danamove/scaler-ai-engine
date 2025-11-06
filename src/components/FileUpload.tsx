@@ -62,6 +62,18 @@ export const FileUpload = ({
     return emptyValues.includes(str.toLowerCase()) ? '' : str;
   };
 
+  // Security: Sanitize CSV values to prevent formula injection
+  const sanitizeForCSV = (value: string): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    // If value starts with dangerous characters (=, +, -, @, tab, carriage return)
+    // prepend with single quote to prevent Excel formula execution
+    if (/^[=+\-@\t\r]/.test(trimmed)) {
+      return `'${trimmed}`;
+    }
+    return trimmed;
+  };
+
   // Helper function to get the first non-empty value from multiple possible field names
   const getField = (row: any, candidates: string[]): string => {
     for (const key of candidates) {
@@ -182,17 +194,17 @@ export const FileUpload = ({
         return {
           user_id: activeUserId,
           job_id: currentJobId,
-          full_name: fullName,
-          current_title: currentTitle,
-          current_company: currentCompany,
-          previous_company: previousCompany,
-          linkedin_url: linkedinUrl,
-          location: location,
-          skills: skills,
-          job_description: jobDescription,
-          degree: degree,
-          profile_summary: profileSummary,
-          education: education,
+          full_name: sanitizeForCSV(fullName),
+          current_title: sanitizeForCSV(currentTitle),
+          current_company: sanitizeForCSV(currentCompany),
+          previous_company: sanitizeForCSV(previousCompany),
+          linkedin_url: sanitizeForCSV(linkedinUrl),
+          location: sanitizeForCSV(location),
+          skills: sanitizeForCSV(skills),
+          job_description: sanitizeForCSV(jobDescription),
+          degree: sanitizeForCSV(degree),
+          profile_summary: sanitizeForCSV(profileSummary),
+          education: sanitizeForCSV(education),
           years_of_experience: getYearsFromDateRange(getField(row, ['linkedinJobDateRange', 'dateRange', 'jobDateRange'])),
           months_in_current_role: getCurrentRoleMonths(getField(row, ['linkedinJobDateRange', 'dateRange', 'jobDateRange'])),
         };
@@ -268,7 +280,18 @@ export const FileUpload = ({
 
   const handleFileUpload = async (file: File) => {
     console.log('Starting file upload for:', file.name, 'Size:', file.size);
-    
+
+    // Security: Check file size (max 50MB)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "File Too Large",
+        description: `Maximum file size is 50MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!file.name.toLowerCase().endsWith('.csv')) {
       toast({
         title: "Invalid File Type",
