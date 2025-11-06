@@ -158,11 +158,12 @@ export const useJobManager = () => {
     if (!activeUserId) return { totalCandidates: 0, processedCandidates: 0, finalResults: 0 };
 
     try {
-      // Get total candidates for this job from raw_data (this doesn't have job_id, so we get all)
+      // Get total candidates for this job from raw_data
       const { count: totalCandidates } = await supabase
         .from('raw_data')
         .select('*', { count: 'exact' })
-        .eq('user_id', activeUserId);
+        .eq('user_id', activeUserId)
+        .eq('job_id', jobId);
 
       // Get processed candidates for this job
       const { count: processedCandidates } = await supabase

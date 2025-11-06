@@ -534,7 +534,7 @@ const ProcessFilter = () => {
           results.push({
             raw_data_id: candidate.id,
             user_id: getActiveUserId(),
-            job_id: 'current',
+            job_id: filterRules.job_id,
             stage_1_passed: false,
             stage_2_passed: false,
             filter_reasons: filterReasons
@@ -738,7 +738,7 @@ const ProcessFilter = () => {
                     results.push({
                       raw_data_id: candidate.id,
                       user_id: getActiveUserId(),
-                      job_id: 'current',
+                      job_id: filterRules.job_id,
                       stage_1_passed: true,
                       stage_2_passed: stage2Pass,
                       filter_reasons: filterReasons
@@ -846,7 +846,7 @@ const ProcessFilter = () => {
                   results.push({
                     raw_data_id: candidate.id,
                     user_id: getActiveUserId(),
-                    job_id: 'current',
+                    job_id: filterRules.job_id,
                     stage_1_passed: true,
                     stage_2_passed: stage2Pass,
                     filter_reasons: filterReasons

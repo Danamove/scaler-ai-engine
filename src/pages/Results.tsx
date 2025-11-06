@@ -79,6 +79,17 @@ const Results = () => {
     try {
       setLoadingResults(true);
 
+      // Get the current job_id (latest from filter_rules)
+      const { data: filterRulesArray } = await supabase
+        .from('filter_rules')
+        .select('job_id')
+        .eq('user_id', activeUserId)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      const currentJobId = filterRulesArray?.[0]?.job_id || 'current';
+      console.log(`[Results] Loading results for user ${activeUserId}, job ${currentJobId}`);
+
       // Get all filtered results with pagination to handle large datasets
       let allResults = [];
       let hasMore = true;
@@ -101,6 +112,7 @@ const Results = () => {
             )
           `)
           .eq('user_id', activeUserId)
+          .eq('job_id', currentJobId)
           .order('created_at', { ascending: false })
           .range(offset, offset + pageSize - 1);
 
@@ -135,8 +147,17 @@ const Results = () => {
 
       setResults(transformedResults);
 
+      // Get total raw candidates for this job (separate query)
+      const { count: rawCandidatesCount } = await supabase
+        .from('raw_data')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', activeUserId)
+        .eq('job_id', currentJobId);
+
+      console.log(`[Results] Raw candidates: ${rawCandidatesCount}, Filtered results: ${transformedResults.length}`);
+
       // Calculate stats
-      const totalCandidates = transformedResults.length;
+      const totalCandidates = rawCandidatesCount || 0;
       const stage1Passed = transformedResults.filter(r => r.stage_1_passed).length;
       const finalResults = transformedResults.filter(r => r.stage_1_passed && r.stage_2_passed).length;
       // Stage 2 passed should be the same as final results since you can only pass stage 2 if you passed stage 1
@@ -148,6 +169,8 @@ const Results = () => {
         stage_2_passed: stage2Passed,
         final_results: finalResults
       });
+
+      console.log(`[Results] Stats - Total: ${totalCandidates}, Stage1: ${stage1Passed}, Stage2: ${stage2Passed}, Final: ${finalResults}`);
 
     } catch (error: any) {
       console.error('Load results error:', error);

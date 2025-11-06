@@ -52,6 +52,7 @@ const Dashboard = () => {
         supabase.from('filter_rules').delete().eq('user_id', activeUserId),
         supabase.from('user_blacklist').delete().eq('user_id', activeUserId),
         supabase.from('user_wanted_companies').delete().eq('user_id', activeUserId),
+        supabase.from('user_wanted_universities').delete().eq('user_id', activeUserId),
         supabase.from('user_past_candidates').delete().eq('user_id', activeUserId),
         supabase.from('netly_files').delete().eq('user_id', activeUserId),
         supabase.from('jobs').delete().eq('user_id', activeUserId)
