@@ -559,10 +559,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_email_allowed: {
-        Args: { check_email: string }
-        Returns: boolean
-      }
+      is_email_allowed: { Args: { check_email: string }; Returns: boolean }
     }
     Enums: {
       user_role: "admin" | "user"
