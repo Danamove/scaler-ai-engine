@@ -352,6 +352,12 @@ const ProcessFilter = () => {
         .eq('user_id', getActiveUserId())
         .eq('job_id', currentJobId);
 
+      console.log('🔍 Past Candidates Debug:', {
+        jobId: currentJobId,
+        count: pastCandidates?.length || 0,
+        sample: pastCandidates?.slice(0, 3).map(p => p.candidate_name) || []
+      });
+
       console.log('Loaded lists:', {
         synonyms: synonyms?.length || 0,
         notRelevantCompanies: notRelevantCompanies?.length || 0,

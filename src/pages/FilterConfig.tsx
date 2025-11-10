@@ -13,15 +13,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
+import { useCurrentJob } from '@/hooks/useCurrentJob';
 
 const FilterConfig = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
+  const { jobId, jobName, loading: jobLoading } = useCurrentJob();
   
   const [config, setConfig] = useState({
-    jobTitle: '',
     // Stage 1 Filters
     useNotRelevantFilter: false,
     useTargetCompaniesFilter: false,
@@ -73,7 +74,6 @@ const FilterConfig = () => {
         if (filterRules) {
           setHasExistingData(true);
           setConfig({
-            jobTitle: filterRules.job_id || '',
             useNotRelevantFilter: filterRules.use_not_relevant_filter || false,
             useTargetCompaniesFilter: filterRules.use_target_companies_filter || false,
             useWantedCompaniesFilter: filterRules.use_wanted_companies_filter ?? true,
@@ -157,10 +157,10 @@ const FilterConfig = () => {
   }
 
   const handleSaveConfig = async () => {
-    if (!config.jobTitle.trim()) {
+    if (!jobId || jobId.length !== 36) {
       toast({
-        title: "Job Title Required",
-        description: "Please enter a Job Title to save the configuration.",
+        title: "Invalid Job ID",
+        description: "Please refresh the page and try again.",
         variant: "destructive",
       });
       return;
@@ -174,7 +174,7 @@ const FilterConfig = () => {
         .from('filter_rules')
         .upsert({
           user_id: user.id,
-          job_id: config.jobTitle,
+          job_id: jobId,
           // Stage 1 settings
           use_not_relevant_filter: config.useNotRelevantFilter,
           use_target_companies_filter: config.useTargetCompaniesFilter,
@@ -201,7 +201,7 @@ const FilterConfig = () => {
         if (uniqueCompanies.length > 0) {
           const blacklistData = uniqueCompanies.map(company => ({
             user_id: user.id,
-            job_id: config.jobTitle,
+            job_id: jobId,
             company_name: company,
           }));
 
@@ -221,7 +221,7 @@ const FilterConfig = () => {
         if (uniqueCompanies.length > 0) {
           const wantedData = uniqueCompanies.map(company => ({
             user_id: user.id,
-            job_id: config.jobTitle,
+            job_id: jobId,
             company_name: company,
           }));
 
@@ -241,7 +241,7 @@ const FilterConfig = () => {
         if (uniqueUniversities.length > 0) {
           const universitiesData = uniqueUniversities.map(university => ({
             user_id: user.id,
-            job_id: config.jobTitle,
+            job_id: jobId,
             university_name: university,
           }));
 
@@ -262,7 +262,7 @@ const FilterConfig = () => {
         if (uniqueCandidates.length > 0) {
           const candidatesData = uniqueCandidates.map(candidate => ({
             user_id: user.id,
-            job_id: config.jobTitle,
+            job_id: jobId,
             candidate_name: candidate,
           }));
 
@@ -276,7 +276,7 @@ const FilterConfig = () => {
 
       toast({
         title: "Configuration Saved!",
-        description: `Filter rules for "${config.jobTitle}" have been saved successfully.`,
+        description: `Filter rules for "${jobName}" have been saved successfully.`,
       });
 
       // Mark that we now have existing data
@@ -356,15 +356,14 @@ const FilterConfig = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="jobTitle">Job Title *</Label>
+                  <Label htmlFor="jobTitle">Current Job</Label>
                   <Input
                     id="jobTitle"
-                    placeholder="e.g. Senior Product Manager"
-                    value={config.jobTitle}
-                    onChange={(e) => setConfig({...config, jobTitle: e.target.value})}
+                    value={jobName || 'Loading...'}
+                    disabled
                   />
                   <p className="text-xs text-muted-foreground">
-                    Job title for this filtering configuration
+                    Current job session (automatically managed)
                   </p>
                 </div>
 
@@ -607,7 +606,7 @@ const FilterConfig = () => {
               variant="hero" 
               size="xl" 
               onClick={handleSaveConfig}
-              disabled={saving || loadingData}
+              disabled={saving || loadingData || jobLoading || !jobId}
             >
               <Save className="h-5 w-5" />
               {saving ? 'Saving...' : 'Save Configuration'}
