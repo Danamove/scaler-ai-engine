@@ -334,6 +334,12 @@ const ProcessFilter = () => {
         .eq('user_id', getActiveUserId())
         .eq('job_id', currentJobId);
 
+      console.log('🚫 Blacklist Debug:', {
+        jobId: currentJobId,
+        count: blacklistCompanies?.length || 0,
+        companies: blacklistCompanies?.map(b => b.company_name) || []
+      });
+
       const { data: wantedCompanies } = await supabase
         .from('user_wanted_companies')
         .select('company_name')
@@ -399,23 +405,34 @@ const ProcessFilter = () => {
         let stage1Pass = true;
         const filterReasons = [];
 
-        // Enhanced blacklist check with normalization and aliases
+        // Enhanced blacklist check - בדיקת current AND previous companies
         const blacklist = blacklistCompanies?.map(b => b.company_name) || [];
         let blacklistMatch = null;
         
+        // בדוק current_company
         if (candidate.current_company) {
           for (const blacklistCompany of blacklist) {
             if (isCompanyMatch(candidate.current_company, blacklistCompany)) {
-              blacklistMatch = blacklistCompany;
+              blacklistMatch = `${blacklistCompany} (Current)`;
               break;
             }
           }
-          
-          if (blacklistMatch) {
-            stage1Pass = false;
-            filterReasons.push(`Blacklisted company: ${blacklistMatch}`);
-            console.log(`Blacklist match - Candidate: ${candidate.full_name}, Company: ${candidate.current_company}, Matched: ${blacklistMatch}`);
+        }
+        
+        // בדוק previous_company גם אם לא מצאנו match ב-current
+        if (!blacklistMatch && candidate.previous_company) {
+          for (const blacklistCompany of blacklist) {
+            if (isCompanyMatch(candidate.previous_company, blacklistCompany)) {
+              blacklistMatch = `${blacklistCompany} (Previous)`;
+              break;
+            }
           }
+        }
+        
+        if (blacklistMatch) {
+          stage1Pass = false;
+          filterReasons.push(`Blacklisted company: ${blacklistMatch}`);
+          console.log(`Blacklist match - Candidate: ${candidate.full_name}, Matched: ${blacklistMatch}`);
         }
 
         // Check past candidates
