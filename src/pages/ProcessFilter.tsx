@@ -420,8 +420,8 @@ const ProcessFilter = () => {
 
         // Check past candidates
         if (stage1Pass) {
-          const pastCandidateNames = pastCandidates?.map(p => p.candidate_name.toLowerCase()) || [];
-          if (candidate.full_name && pastCandidateNames.includes(candidate.full_name.toLowerCase())) {
+          const pastCandidateNames = pastCandidates?.map(p => p.candidate_name.trim().toLowerCase()) || [];
+          if (candidate.full_name && pastCandidateNames.includes(candidate.full_name.trim().toLowerCase())) {
             stage1Pass = false;
             filterReasons.push('Past candidate');
           }
