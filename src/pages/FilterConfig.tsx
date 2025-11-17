@@ -14,13 +14,15 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminImpersonation } from '@/hooks/useAdminImpersonation';
 import { useCurrentJob } from '@/hooks/useCurrentJob';
+import { useJobManager } from '@/hooks/useJobManager';
 
 const FilterConfig = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
-  const { jobId, jobName, loading: jobLoading } = useCurrentJob();
+  const { jobId, jobName, loading: jobLoading, setActiveJob } = useCurrentJob();
+  const { createJob } = useJobManager();
   
   // Debug logging for job info
   useEffect(() => {
@@ -61,6 +63,29 @@ const FilterConfig = () => {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  // Self-healing: Create valid job if missing or invalid
+  useEffect(() => {
+    const healInvalidJob = async () => {
+      if (jobLoading || !user) return;
+      
+      if (!jobId || jobId.length !== 36) {
+        console.warn('Self-healing: Creating new job due to invalid jobId:', jobId);
+        const newJobId = crypto.randomUUID();
+        const newName = `Session ${new Date().toLocaleDateString()}`;
+        const success = await createJob(newJobId, newName);
+        if (success) {
+          setActiveJob({ jobId: newJobId, jobName: newName });
+          toast({
+            title: "New Session Started",
+            description: "Started a new session because the previous Job ID was invalid.",
+          });
+        }
+      }
+    };
+
+    healInvalidJob();
+  }, [jobId, jobLoading, user]);
 
   // Load existing configuration data
   useEffect(() => {
@@ -618,7 +643,7 @@ const FilterConfig = () => {
               variant="hero" 
               size="xl" 
               onClick={handleSaveConfig}
-              disabled={saving || loadingData || jobLoading || !jobId}
+              disabled={saving || loadingData || jobLoading || !jobId || jobId.length !== 36}
             >
               <Save className="h-5 w-5" />
               {saving ? 'Saving...' : 'Save Configuration'}

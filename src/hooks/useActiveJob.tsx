@@ -27,7 +27,14 @@ export const useActiveJob = () => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          setActiveJob(parsed);
+          // Validate that jobId is a proper UUID
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (parsed?.jobId && uuidRegex.test(parsed.jobId)) {
+            setActiveJob(parsed);
+          } else {
+            console.warn('Invalid jobId in localStorage, clearing:', parsed?.jobId);
+            localStorage.removeItem(storageKey);
+          }
         } catch (error) {
           console.error('Failed to parse active job from localStorage:', error);
           localStorage.removeItem(storageKey);
