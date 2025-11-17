@@ -34,9 +34,9 @@ export const useCurrentJob = () => {
         return;
       }
 
-      // 1) URL param takes precedence
+      // 1) URL param takes precedence (but only if valid UUID)
       const paramJob = searchParams.get('job');
-      if (paramJob) {
+      if (paramJob && isValidUUID(paramJob)) {
         try {
           const { data: jobRow } = await supabase
             .from('jobs')
@@ -45,20 +45,37 @@ export const useCurrentJob = () => {
             .eq('job_id', paramJob)
             .maybeSingle();
 
-          const name = jobRow?.job_name || `Session ${paramJob.slice(0, 6)}`;
-          setState({ jobId: paramJob, jobName: name });
-          setActiveJob({ jobId: paramJob, jobName: name });
+          if (jobRow) {
+            // Job exists in database
+            setState({ jobId: paramJob, jobName: jobRow.job_name });
+            setActiveJob({ jobId: paramJob, jobName: jobRow.job_name });
+          } else {
+            // Create job for this valid UUID
+            const newName = `Session ${paramJob.slice(0, 6)}`;
+            await createJob(paramJob, newName);
+            setState({ jobId: paramJob, jobName: newName });
+            setActiveJob({ jobId: paramJob, jobName: newName });
+          }
         } finally {
           setLoading(false);
         }
         return;
+      } else if (paramJob && !isValidUUID(paramJob)) {
+        // Invalid UUID in URL, ignore it and continue to next resolution step
+        console.warn('Invalid job UUID in URL parameter, ignoring:', paramJob);
       }
 
-      // 2) Local storage active job
+      // 2) Local storage active job (sanitize invalid UUIDs)
       if (activeJob?.jobId) {
-        setState({ jobId: activeJob.jobId, jobName: activeJob.jobName || '' });
-        setLoading(false);
-        return;
+        if (!isValidUUID(activeJob.jobId)) {
+          console.warn('Invalid jobId in localStorage, clearing:', activeJob.jobId);
+          clearActiveJob();
+          // Don't return, continue to next resolution step
+        } else {
+          setState({ jobId: activeJob.jobId, jobName: activeJob.jobName || '' });
+          setLoading(false);
+          return;
+        }
       }
 
       // 3) Latest job from jobs table
