@@ -57,12 +57,19 @@ const FilterConfig = () => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [hasExistingData, setHasExistingData] = useState(false);
+  const [editableJobName, setEditableJobName] = useState(jobName);
+  const [updatingJobName, setUpdatingJobName] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
     }
   }, [user, loading, navigate]);
+
+  // Sync editableJobName with jobName
+  useEffect(() => {
+    setEditableJobName(jobName);
+  }, [jobName]);
 
   // Self-healing: Create valid job if missing or invalid
   useEffect(() => {
@@ -191,6 +198,65 @@ const FilterConfig = () => {
   if (!user) {
     return null;
   }
+
+  const handleJobNameUpdate = async (newName: string) => {
+    if (!jobId || !newName.trim() || newName === jobName) return;
+    
+    setUpdatingJobName(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ job_name: newName, updated_at: new Date().toISOString() })
+        .eq('job_id', jobId)
+        .eq('user_id', getActiveUserId());
+
+      if (error) throw error;
+
+      setActiveJob({ jobId, jobName: newName });
+      toast({
+        title: "Job name updated",
+        description: `Renamed to "${newName}"`,
+      });
+    } catch (error) {
+      console.error('Error updating job name:', error);
+      toast({
+        title: "Failed to update job name",
+        description: "Please try again",
+        variant: "destructive",
+      });
+      setEditableJobName(jobName); // Revert on error
+    } finally {
+      setUpdatingJobName(false);
+    }
+  };
+
+  const handleCreateNewJob = async () => {
+    const newJobId = crypto.randomUUID();
+    const newName = `Session ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+    
+    setSaving(true);
+    try {
+      const success = await createJob(newJobId, newName);
+      if (success) {
+        setActiveJob({ jobId: newJobId, jobName: newName });
+        toast({
+          title: "New Job Created",
+          description: `Started a new job: "${newName}"`,
+        });
+      } else {
+        throw new Error('Failed to create job');
+      }
+    } catch (error) {
+      console.error('Error creating new job:', error);
+      toast({
+        title: "Failed to create new job",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSaveConfig = async () => {
     if (!jobId || jobId.length !== 36) {
@@ -394,13 +460,32 @@ const FilterConfig = () => {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="jobTitle">Current Job</Label>
-                  <Input
-                    id="jobTitle"
-                    value={jobName || 'Loading...'}
-                    disabled
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="jobTitle"
+                      value={editableJobName || ''}
+                      onChange={(e) => setEditableJobName(e.target.value)}
+                      onBlur={(e) => handleJobNameUpdate(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      disabled={updatingJobName || !jobId}
+                      placeholder="Enter job name..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCreateNewJob}
+                      disabled={saving}
+                    >
+                      New Job
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Current job session (automatically managed)
+                    Editable - press Enter to save. Click "New Job" to start fresh.
                   </p>
                 </div>
 
