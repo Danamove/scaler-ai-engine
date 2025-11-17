@@ -10,6 +10,13 @@ interface CurrentJobState {
   jobName: string;
 }
 
+// Helper function to validate UUID format
+const isValidUUID = (str: string | null | undefined): boolean => {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
 export const useCurrentJob = () => {
   const [searchParams] = useSearchParams();
   const { activeJob, setActiveJob, clearActiveJob, loading: activeJobLoading } = useActiveJob();
@@ -64,6 +71,19 @@ export const useCurrentJob = () => {
         .maybeSingle();
 
       if (latestJob) {
+        // Validate that job_id is a proper UUID
+        if (!isValidUUID(latestJob.job_id)) {
+          console.warn('Found invalid job_id, creating new job:', latestJob.job_id);
+          // Create new job instead of using invalid one
+          const newJobId = crypto.randomUUID();
+          const newName = `Session ${new Date().toLocaleDateString()}`;
+          await createJob(newJobId, newName);
+          setActiveJob({ jobId: newJobId, jobName: newName });
+          setState({ jobId: newJobId, jobName: newName });
+          setLoading(false);
+          return;
+        }
+        
         setState({ jobId: latestJob.job_id, jobName: latestJob.job_name });
         setActiveJob({ jobId: latestJob.job_id, jobName: latestJob.job_name });
         setLoading(false);
@@ -80,8 +100,10 @@ export const useCurrentJob = () => {
         .maybeSingle();
 
       let resolvedJobId = latestRule?.job_id as string | undefined;
-      if (!resolvedJobId) {
-        resolvedJobId = (globalThis as any).crypto?.randomUUID?.() || `${Date.now()}`;
+      
+      // Validate resolved job_id and ensure it's a proper UUID
+      if (!resolvedJobId || !isValidUUID(resolvedJobId)) {
+        resolvedJobId = crypto.randomUUID();
       }
       const newName = `Session ${new Date().toLocaleDateString()}`;
 

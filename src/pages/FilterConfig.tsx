@@ -22,6 +22,17 @@ const FilterConfig = () => {
   const { getActiveUserId, getActiveUserEmail, isImpersonating, impersonatedUser } = useAdminImpersonation();
   const { jobId, jobName, loading: jobLoading } = useCurrentJob();
   
+  // Debug logging for job info
+  useEffect(() => {
+    if (!jobLoading) {
+      console.log('FilterConfig - Current Job:', { 
+        jobId, 
+        jobName, 
+        isValidLength: jobId?.length === 36 
+      });
+    }
+  }, [jobId, jobName, jobLoading]);
+  
   const [config, setConfig] = useState({
     // Stage 1 Filters
     useNotRelevantFilter: false,
@@ -159,10 +170,11 @@ const FilterConfig = () => {
   const handleSaveConfig = async () => {
     if (!jobId || jobId.length !== 36) {
       toast({
-        title: "Invalid Job ID",
-        description: "Please refresh the page and try again.",
+        title: "שגיאה בזיהוי המשרה",
+        description: "לא ניתן לזהות את המשרה הנוכחית. אנא רענן את הדף ונסה שוב. אם הבעיה נמשכת, צור משרה חדשה מהדשבורד.",
         variant: "destructive",
       });
+      console.error('Invalid job_id:', { jobId, length: jobId?.length });
       return;
     }
 
