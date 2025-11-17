@@ -170,8 +170,8 @@ const FilterConfig = () => {
   const handleSaveConfig = async () => {
     if (!jobId || jobId.length !== 36) {
       toast({
-        title: "שגיאה בזיהוי המשרה",
-        description: "לא ניתן לזהות את המשרה הנוכחית. אנא רענן את הדף ונסה שוב. אם הבעיה נמשכת, צור משרה חדשה מהדשבורד.",
+        title: "Invalid Job ID",
+        description: "Unable to identify the current job. Please refresh the page and try again. If the problem persists, create a new job from the dashboard.",
         variant: "destructive",
       });
       console.error('Invalid job_id:', { jobId, length: jobId?.length });
