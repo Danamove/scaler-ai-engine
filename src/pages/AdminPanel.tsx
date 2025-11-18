@@ -336,6 +336,37 @@ const AdminPanel = () => {
     });
   };
 
+  const exportTargetCompaniesToCSV = () => {
+    // Convert data to CSV format
+    const csvData = targetCompanies.map(company => ({
+      'Company Name': company.company_name,
+      'Category': company.category || ''
+    }));
+
+    // Generate CSV string
+    const csv = Papa.unparse(csvData, {
+      header: true
+    });
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `target-companies-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Export successful",
+      description: `Exported ${targetCompanies.length} companies to CSV`,
+    });
+  };
+
   const addNotRelevantCompany = async () => {
     if (!newNotRelevantCompany.name.trim()) return;
     
@@ -1011,7 +1042,18 @@ const AdminPanel = () => {
                 <Separator />
 
                 <div className="space-y-2">
-                  <h4 className="font-medium">Current Target Companies ({targetCompanies.length})</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Current Target Companies ({targetCompanies.length})</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportTargetCompaniesToCSV}
+                      disabled={targetCompanies.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export to CSV
+                    </Button>
+                  </div>
                   <div className="max-h-96 overflow-y-auto space-y-2">
                     {targetCompanies.map((company) => (
                       <div key={company.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
